@@ -92,16 +92,24 @@ DevTeamResourceManager/
 │   ├── RULES.md        # 项目规则
 │   ├── FRONTEND_RULES.md # 前端规范
 │   ├── BACKEND_RULES.md  # 后端规范
-│   └── DEVELOPMENT_GUIDE.md # 开发指南
+│   ├── DEVELOPMENT_GUIDE.md # 开发指南
+│   └── requirements/   # 需求文档
+│       ├── SPECIFICATION.md # 需求规格说明书
+│       └── USER_STORIES.md  # 用户故事
 └── README.md           # 项目说明
 ```
 
 ## 📚 文档
 
+### 开发规范
 - [项目开发规范](./docs/RULES.md)
 - [前端开发规范](./docs/FRONTEND_RULES.md)
 - [后端开发规范](./docs/BACKEND_RULES.md)
 - [开发指南](./docs/DEVELOPMENT_GUIDE.md)
+
+### 需求文档
+- [需求规格说明书](./docs/requirements/SPECIFICATION.md)
+- [用户故事](./docs/requirements/USER_STORIES.md)
 
 ## 🧪 测试
 
