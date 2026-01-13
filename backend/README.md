@@ -8,7 +8,7 @@
 - FastAPI 0.104+
 - SQLAlchemy 2.0+
 - Alembic 1.13+
-- PostgreSQL 15+ / SQLite（开发）
+- MySQL 5.7+ / SQLite（开发）
 
 ## 快速开始
 
@@ -37,8 +37,8 @@ cp .env.example .env
 # 使用SQLite（开发环境）
 # 在.env中设置 USE_SQLITE=True
 
-# 或使用PostgreSQL（需要先启动docker-compose）
-docker-compose up -d postgres
+# 或使用MySQL（当前配置）
+# 在.env中配置MySQL连接信息，或使用默认配置
 
 # 运行数据库迁移
 alembic revision --autogenerate -m "初始化数据库"

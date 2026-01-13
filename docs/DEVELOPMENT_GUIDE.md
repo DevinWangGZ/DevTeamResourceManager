@@ -237,7 +237,7 @@ Closes #123"
 
 - **Node.js**：18.0+（前端）
 - **Python**：3.12+（后端）
-- **PostgreSQL**：15+（生产）或SQLite（开发）
+- **MySQL**：5.7+（生产）或SQLite（开发）
 - **Git**：2.30+
 
 ### 环境变量
@@ -255,10 +255,12 @@ VITE_APP_TITLE=DevTeam Manager (开发环境)
 创建`.env`：
 ```env
 # 数据库配置
-POSTGRES_SERVER=localhost
-POSTGRES_USER=devteam
-POSTGRES_PASSWORD=devteam123
-POSTGRES_DB=devteam_manager
+DATABASE_TYPE=mysql
+MYSQL_SERVER=10.254.68.77
+MYSQL_USER=root
+MYSQL_PASSWORD=123456
+MYSQL_DB=devteam_manager
+MYSQL_PORT=3306
 
 # JWT配置
 SECRET_KEY=your-secret-key-change-in-production

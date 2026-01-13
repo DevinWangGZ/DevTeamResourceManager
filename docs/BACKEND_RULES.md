@@ -24,7 +24,7 @@
 ### ORM与数据库
 - **SQLAlchemy 2.0+**：ORM框架
 - **Alembic 1.13+**：数据库迁移工具
-- **asyncpg 0.29+**：异步PostgreSQL驱动
+- **PyMySQL 1.1+**：MySQL Python驱动
 
 ### 安全与认证
 - **Python-Jose 3.3+**：JWT令牌处理
@@ -42,17 +42,18 @@
 ## 数据库与缓存
 
 ### 数据库
-- **PostgreSQL 15+**：主数据库（生产环境）
-- **SQLite 3.41+**：开发与测试数据库
+- **MySQL 5.7+**：主数据库（生产环境）
+- **SQLite 3.41+**：开发与测试数据库（可选）
+- **PostgreSQL 15+**：备用数据库（可选）
 
 ### 缓存（可选）
 - **Redis 7.2+**：缓存与会话存储
 - **aioredis 2.0+**：异步Redis客户端
 
 ### 数据库选择策略
-- **开发环境**：使用SQLite，快速启动
-- **测试环境**：使用SQLite或PostgreSQL（根据测试需求）
-- **生产环境**：必须使用PostgreSQL
+- **开发环境**：使用MySQL或SQLite，快速启动
+- **测试环境**：使用MySQL或SQLite（根据测试需求）
+- **生产环境**：使用MySQL（当前配置）
 
 ---
 
@@ -353,10 +354,12 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     
     # 数据库配置
-    POSTGRES_SERVER: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
+    DATABASE_TYPE: str = "mysql"  # 数据库类型: mysql, postgresql, sqlite
+    MYSQL_SERVER: str
+    MYSQL_USER: str
+    MYSQL_PASSWORD: str
+    MYSQL_DB: str
+    MYSQL_PORT: int = 3306
     DATABASE_URL: Optional[str] = None
     
     @property
@@ -364,7 +367,10 @@ class Settings(BaseSettings):
         """构建数据库URL"""
         if self.DATABASE_URL:
             return self.DATABASE_URL
-        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
+        if self.DATABASE_TYPE == "mysql":
+            return f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}@{self.MYSQL_SERVER}:{self.MYSQL_PORT}/{self.MYSQL_DB}?charset=utf8mb4"
+        # 其他数据库类型...
+        return f"sqlite:///./devteam_manager.db"
     
     # SQLite配置（开发环境）
     SQLITE_DB: str = "devteam_manager.db"
@@ -819,18 +825,17 @@ def published_task(db: Session, manager_user: User) -> Task:
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
+  mysql:
+    image: mysql:5.7
     environment:
-      POSTGRES_USER: devteam
-      POSTGRES_PASSWORD: devteam123
-      POSTGRES_DB: devteam_manager
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: devteam_manager
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U devteam"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -852,11 +857,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://devteam:devteam123@postgres:5432/devteam_manager
+      DATABASE_URL: mysql+pymysql://root:123456@mysql:3306/devteam_manager?charset=utf8mb4
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: your-secret-key-here
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -865,7 +870,7 @@ services:
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 volumes:
-  postgres_data:
+  mysql_data:
 ```
 
 ### Dockerfile示例
@@ -914,11 +919,13 @@ API_V1_STR=/api/v1
 DEBUG=True
 
 # 数据库配置
-POSTGRES_SERVER=localhost
-POSTGRES_USER=devteam
-POSTGRES_PASSWORD=devteam123
-POSTGRES_DB=devteam_manager
-DATABASE_URL=postgresql://devteam:devteam123@localhost:5432/devteam_manager
+DATABASE_TYPE=mysql
+MYSQL_SERVER=10.254.68.77
+MYSQL_USER=root
+MYSQL_PASSWORD=123456
+MYSQL_DB=devteam_manager
+MYSQL_PORT=3306
+# DATABASE_URL=mysql+pymysql://root:123456@10.254.68.77:3306/devteam_manager?charset=utf8mb4
 
 # JWT配置
 SECRET_KEY=your-secret-key-change-in-production

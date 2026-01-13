@@ -417,7 +417,7 @@ POST   /api/tasks/:id/confirm # 确认任务
 - FastAPI 0.104+ (异步Web框架)
 - SQLAlchemy 2.0+ (ORM)
 - Alembic 1.13+ (数据库迁移)
-- PostgreSQL 15+ (生产数据库)
+- MySQL 5.7+ (生产数据库)
 - Pydantic 2.5+ (数据验证)
 - Python-Jose 3.3+ (JWT认证)
 

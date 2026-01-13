@@ -352,7 +352,7 @@
 
 #### 技术栈选择
 - **前端**：Vue 3 + TypeScript + Vite + Element Plus
-- **后端**：Python + FastAPI + SQLAlchemy + PostgreSQL
+- **后端**：Python + FastAPI + SQLAlchemy + MySQL
 - **部署**：Docker + Docker Compose（开发环境）
 
 #### 关键决策

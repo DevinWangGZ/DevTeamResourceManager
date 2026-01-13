@@ -50,7 +50,20 @@
 
 ## 使用说明
 
-### PostgreSQL
+### MySQL（当前使用）
+
+```bash
+# 连接到MySQL数据库
+mysql -h 10.254.68.77 -u root -p123456
+
+# 执行建表语句
+mysql -h 10.254.68.77 -u root -p123456 < backend/sql/01_create_tables_mysql.sql
+
+# 执行初始化数据（可选）
+mysql -h 10.254.68.77 -u root -p123456 < backend/sql/02_init_data_mysql.sql
+```
+
+### PostgreSQL（备用）
 
 ```bash
 # 连接到数据库

@@ -6,7 +6,7 @@
 
 - Python 3.12+ (当前使用 3.13.9)
 - Node.js 18.0+
-- Docker & Docker Compose (可选，用于PostgreSQL)
+- MySQL 5.7+ 或 Docker & Docker Compose (可选，用于MySQL)
 
 ## 快速开始
 
@@ -90,27 +90,30 @@ USE_SQLITE=True
 SQLITE_DB=devteam_manager.db
 ```
 
-### 使用PostgreSQL
+### 使用MySQL（当前配置）
 
-1. 启动PostgreSQL容器：
-```bash
-docker-compose up -d postgres
-```
+1. 确保MySQL服务已启动（当前使用远程MySQL：10.254.68.77）
 
 2. 在 `backend/.env` 中配置：
 ```env
-USE_SQLITE=False
-POSTGRES_SERVER=localhost
-POSTGRES_USER=devteam
-POSTGRES_PASSWORD=devteam123
-POSTGRES_DB=devteam_manager
+DATABASE_TYPE=mysql
+MYSQL_SERVER=10.254.68.77
+MYSQL_USER=root
+MYSQL_PASSWORD=123456
+MYSQL_DB=devteam_manager
+MYSQL_PORT=3306
 ```
 
-3. 运行数据库迁移：
+3. 执行SQL脚本创建数据库和表：
 ```bash
-cd backend
-alembic revision --autogenerate -m "初始化数据库"
-alembic upgrade head
+cd backend/sql
+mysql -h 10.254.68.77 -u root -p123456 < 01_create_tables_mysql.sql
+mysql -h 10.254.68.77 -u root -p123456 < 02_init_data_mysql.sql
+```
+
+或者使用Docker启动MySQL（可选）：
+```bash
+docker-compose up -d mysql
 ```
 
 ## 下一步

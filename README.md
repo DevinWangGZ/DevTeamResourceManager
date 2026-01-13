@@ -32,7 +32,7 @@ DevTeam Manager 是一个专为开发团队设计的资源管理与协作平台�
 - **Python 3.12** - 编程语言
 - **FastAPI 0.104+** - 现代Web框架
 - **SQLAlchemy 2.0+** - ORM框架
-- **PostgreSQL 15+** - 关系型数据库
+- **MySQL 5.7+** - 关系型数据库
 - **Alembic 1.13+** - 数据库迁移工具
 
 ## 🚀 快速开始
@@ -41,8 +41,8 @@ DevTeam Manager 是一个专为开发团队设计的资源管理与协作平台�
 
 - Node.js 18.0+
 - Python 3.12+ (当前使用 3.13.9)
-- PostgreSQL 15+（生产环境）或 SQLite（开发环境）
-- Docker & Docker Compose（可选，用于PostgreSQL）
+- MySQL 5.7+（生产环境）或 SQLite（开发环境）
+- Docker & Docker Compose（可选，用于MySQL）
 
 ### 快速启动
 
