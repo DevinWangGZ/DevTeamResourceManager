@@ -9,6 +9,23 @@ export interface UserUpdate {
   status_tag?: string
 }
 
+export interface UserListResponse {
+  total: number
+  items: UserInfo[]
+}
+
+/**
+ * 获取用户列表
+ */
+export function getUsers(params?: {
+  skip?: number
+  limit?: number
+  role?: string
+  is_active?: boolean
+}): Promise<UserListResponse> {
+  return request.get('/api/v1/users', { params })
+}
+
 /**
  * 更新当前用户信息
  */

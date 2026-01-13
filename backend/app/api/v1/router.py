@@ -1,7 +1,7 @@
 """API路由聚合"""
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, tasks, skills, experiences, user_sequences, workload_statistics
+from app.api.v1.endpoints import auth, users, tasks, skills, experiences, user_sequences, workload_statistics, dashboard, projects
 
 api_router = APIRouter()
 
@@ -13,3 +13,5 @@ api_router.include_router(skills.router, prefix="/skills", tags=["技能管理"]
 api_router.include_router(experiences.router, prefix="/experiences", tags=["业务履历管理"])
 api_router.include_router(user_sequences.router, prefix="/user-sequences", tags=["序列管理"])
 api_router.include_router(workload_statistics.router, prefix="/workload-statistics", tags=["工作量统计"])
+api_router.include_router(dashboard.router, prefix="/dashboard", tags=["仪表盘"])
+api_router.include_router(projects.router, prefix="/projects", tags=["项目管理"])

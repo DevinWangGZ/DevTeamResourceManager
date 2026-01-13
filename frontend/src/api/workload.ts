@@ -7,6 +7,7 @@ export interface WorkloadStatistic {
   id: number
   user_id: number
   project_id?: number
+  project_name?: string
   total_man_days: number
   period_start: string
   period_end: string

@@ -9,6 +9,7 @@ from app.models.workload_statistic import WorkloadStatistic
 from app.models.task import Task, TaskStatus
 from app.core.exceptions import NotFoundError, ValidationError
 from app.schemas.workload_statistic import WorkloadStatisticFilterParams
+from sqlalchemy.orm import joinedload
 
 
 class WorkloadStatisticService:
@@ -98,8 +99,8 @@ class WorkloadStatisticService:
         # 获取总数
         total = query.count()
 
-        # 分页和排序
-        statistics = query.order_by(
+        # 分页和排序，使用 joinedload 预加载项目信息
+        statistics = query.options(joinedload(WorkloadStatistic.project)).order_by(
             WorkloadStatistic.period_start.desc(),
             WorkloadStatistic.user_id.asc()
         ).offset(filters.skip).limit(filters.limit).all()
@@ -128,7 +129,7 @@ class WorkloadStatisticService:
         if period_end:
             query = query.filter(WorkloadStatistic.period_end <= period_end)
 
-        return query.order_by(
+        return query.options(joinedload(WorkloadStatistic.project)).order_by(
             WorkloadStatistic.period_start.desc(),
             WorkloadStatistic.project_id.asc()
         ).all()
@@ -151,7 +152,7 @@ class WorkloadStatisticService:
         if period_end:
             query = query.filter(WorkloadStatistic.period_end <= period_end)
 
-        return query.order_by(
+        return query.options(joinedload(WorkloadStatistic.project)).order_by(
             WorkloadStatistic.period_start.desc(),
             WorkloadStatistic.user_id.asc()
         ).all()

@@ -12,6 +12,7 @@ from app.core.exceptions import NotFoundError, PermissionDeniedError, Validation
 from app.schemas.task import TaskCreate, TaskUpdate, TaskFilterParams
 from app.services.schedule_service import ScheduleService
 from app.services.workload_statistic_service import WorkloadStatisticService
+from app.services.project_output_value_service import ProjectOutputValueService
 
 
 class TaskService:
@@ -360,6 +361,15 @@ class TaskService:
             # 如果更新统计失败，记录错误但不影响任务确认
             # 在实际生产环境中，应该记录日志
             pass
+
+        # 任务确认后，更新项目产值统计
+        if task.project_id:
+            try:
+                ProjectOutputValueService.update_project_output_value(db, task.project_id)
+            except Exception as e:
+                # 如果更新项目产值失败，记录错误但不影响任务确认
+                # 在实际生产环境中，应该记录日志
+                pass
 
         return task
 

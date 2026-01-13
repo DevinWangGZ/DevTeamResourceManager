@@ -183,7 +183,13 @@ const handleLogin = async () => {
         const result = await userStore.login(loginForm.username, loginForm.password)
         if (result.success) {
           ElMessage.success('登录成功')
-          router.push('/')
+          // 根据角色跳转到不同页面
+          const role = userStore.userInfo?.role
+          if (role === 'developer') {
+            router.push('/dashboard')
+          } else {
+            router.push('/')
+          }
         } else {
           ElMessage.error(result.message || '登录失败')
         }
@@ -212,7 +218,13 @@ const handleRegister = async () => {
         if (result.success) {
           ElMessage.success('注册成功，已自动登录')
           showRegister.value = false
-          router.push('/')
+          // 注册成功后根据角色跳转
+          const role = userStore.userInfo?.role
+          if (role === 'developer') {
+            router.push('/dashboard')
+          } else {
+            router.push('/')
+          }
         } else {
           ElMessage.error(result.message || '注册失败')
         }

@@ -143,7 +143,7 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="viewTask(row.id)">
               查看
@@ -184,6 +184,15 @@
             >
               确认
             </el-button>
+            <el-button
+              v-if="canDelete(row)"
+              link
+              type="danger"
+              size="small"
+              @click="handleDelete(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -212,6 +221,23 @@
       <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="100px">
         <el-form-item label="任务标题" prop="title">
           <el-input v-model="createForm.title" placeholder="请输入任务标题" />
+        </el-form-item>
+        <el-form-item label="所属项目" prop="project_id">
+          <el-select
+            v-model="createForm.project_id"
+            placeholder="请选择项目"
+            filterable
+            style="width: 100%"
+            clearable
+            :loading="projectLoading"
+          >
+            <el-option
+              v-for="project in projectList"
+              :key="project.id"
+              :label="project.name"
+              :value="project.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="任务描述" prop="description">
           <el-input
@@ -302,9 +328,11 @@ import {
   evaluateTask,
   submitTask,
   confirmTask,
+  deleteTask,
   type Task,
   type TaskCreate,
 } from '@/api/task'
+import { getProjects, type Project } from '@/api/project'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -338,6 +366,7 @@ const createFormRef = ref<FormInstance>()
 const createForm = reactive<TaskCreate>({
   title: '',
   description: '',
+  project_id: undefined,
   estimated_man_days: 0,
   required_skills: '',
 })
@@ -348,6 +377,10 @@ const currentEvaluateTask = ref<Task | null>(null)
 const showSubmitDialog = ref(false)
 const currentSubmitTask = ref<Task | null>(null)
 const submitLoading = ref(false)
+
+// 项目列表
+const projectList = ref<Project[]>([])
+const projectLoading = ref(false)
 const submitFormRef = ref<FormInstance>()
 const submitForm = reactive({
   actual_man_days: 0,
@@ -421,6 +454,11 @@ const canConfirm = (task: Task) => {
     (userStore.userInfo?.role === 'project_manager' ||
       userStore.userInfo?.role === 'system_admin')
   )
+}
+
+const canDelete = (task: Task) => {
+  // 只有创建者可以删除自己创建的任务
+  return task.creator_id === userStore.userInfo?.id
 }
 
 const loadTasks = async () => {
@@ -537,10 +575,23 @@ const resetCreateForm = () => {
   Object.assign(createForm, {
     title: '',
     description: '',
+    project_id: undefined,
     estimated_man_days: 0,
     required_skills: '',
     deadline: undefined,
   })
+}
+
+const loadProjects = async () => {
+  projectLoading.value = true
+  try {
+    const result = await getProjects({ limit: 1000 })
+    projectList.value = result.items
+  } catch (error) {
+    ElMessage.error('加载项目列表失败')
+  } finally {
+    projectLoading.value = false
+  }
 }
 
 const handleClaim = async (taskId: number) => {
@@ -633,8 +684,30 @@ const viewTask = (taskId: number) => {
   router.push({ name: 'TaskDetail', params: { id: taskId } })
 }
 
+const handleDelete = async (task: Task) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除任务"${task.title}"吗？此操作不可恢复。`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    await deleteTask(task.id)
+    ElMessage.success('任务删除成功')
+    loadTasks()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '删除任务失败')
+    }
+  }
+}
+
 onMounted(() => {
   loadTasks()
+  loadProjects()
 })
 </script>
 

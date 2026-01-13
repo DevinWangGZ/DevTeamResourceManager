@@ -1,6 +1,7 @@
 """数据库模型模块"""
 from app.models.base import Base
 from app.models.user import User, UserRole
+from app.models.role import Role, RoleType
 from app.models.skill import Skill, Proficiency
 from app.models.experience import Experience
 from app.models.project import Project
@@ -17,6 +18,8 @@ __all__ = [
     "Base",
     "User",
     "UserRole",
+    "Role",
+    "RoleType",
     "Skill",
     "Proficiency",
     "Experience",

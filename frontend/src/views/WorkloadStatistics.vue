@@ -85,6 +85,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="project_id" label="项目ID" width="100" />
+        <el-table-column prop="project_name" label="项目名称" width="200">
+          <template #default="{ row }">
+            {{ row.project_name || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="total_man_days" label="投入人天" width="120">
           <template #default="{ row }">
             <el-tag type="success">{{ row.total_man_days }}</el-tag>
@@ -158,10 +163,7 @@ const formatDateTime = (dateStr: string) => {
 const loadStatistics = async () => {
   loading.value = true
   try {
-    const params: any = {
-      skip: (currentPage.value - 1) * pageSize.value,
-      limit: pageSize.value,
-    }
+    const params: any = {}
     
     if (filters.project_id) {
       params.project_id = filters.project_id
@@ -181,8 +183,13 @@ const loadStatistics = async () => {
       }),
     ])
 
-    statisticList.value = statisticsResult.items
-    total.value = statisticsResult.total
+    // 客户端分页
+    const allItems = statisticsResult.items
+    total.value = allItems.length
+    const start = (currentPage.value - 1) * pageSize.value
+    const end = start + pageSize.value
+    statisticList.value = allItems.slice(start, end)
+    
     summary.value = summaryResult
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '加载工作量统计失败')
@@ -211,6 +218,15 @@ const handlePageChange = (page: number) => {
 }
 
 onMounted(() => {
+  // 如果没有设置日期范围，设置默认值（当前月份）
+  if (!filters.period_start && !filters.period_end) {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    filters.period_start = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    filters.period_end = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  }
   loadStatistics()
 })
 </script>

@@ -19,6 +19,7 @@ class WorkloadStatisticResponse(BaseModel):
     id: int
     user_id: int
     project_id: Optional[int]
+    project_name: Optional[str] = None
     total_man_days: Decimal
     period_start: date
     period_end: date

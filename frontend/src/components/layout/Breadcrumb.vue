@@ -28,6 +28,18 @@ const items = computed<BreadcrumbItem[]>(() => {
 
   // 根据路由名称添加面包屑
   switch (routeName) {
+    case 'Home':
+      breadcrumbs.push({ title: '首页' })
+      break
+    case 'DeveloperDashboard':
+      breadcrumbs.push({ title: '个人工作台' })
+      break
+    case 'ProjectManagerDashboard':
+      breadcrumbs.push({ title: '项目仪表盘' })
+      break
+    case 'TeamDashboard':
+      breadcrumbs.push({ title: '团队管理仪表盘' })
+      break
     case 'TaskList':
       breadcrumbs.push({ title: '任务管理' })
       break

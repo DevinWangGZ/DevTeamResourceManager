@@ -59,7 +59,14 @@ async def get_statistics(
     # development_lead 和 system_admin 可以查看所有统计
 
     statistics, total = WorkloadStatisticService.get_statistics(db, filters)
-    return WorkloadStatisticListResponse(total=total, items=statistics)
+    # 添加项目名称
+    items = []
+    for stat in statistics:
+        stat_dict = WorkloadStatisticResponse.model_validate(stat).model_dump()
+        if stat.project:
+            stat_dict['project_name'] = stat.project.name
+        items.append(WorkloadStatisticResponse(**stat_dict))
+    return WorkloadStatisticListResponse(total=total, items=items)
 
 
 @router.get("/my", response_model=WorkloadStatisticListResponse)
@@ -78,7 +85,14 @@ async def get_my_statistics(
         period_start=period_start,
         period_end=period_end
     )
-    return WorkloadStatisticListResponse(total=len(statistics), items=statistics)
+    # 添加项目名称
+    items = []
+    for stat in statistics:
+        stat_dict = WorkloadStatisticResponse.model_validate(stat).model_dump()
+        if stat.project:
+            stat_dict['project_name'] = stat.project.name
+        items.append(WorkloadStatisticResponse(**stat_dict))
+    return WorkloadStatisticListResponse(total=len(items), items=items)
 
 
 @router.get("/summary", response_model=WorkloadSummaryResponse)
@@ -134,4 +148,11 @@ async def get_project_statistics(
         period_start=period_start,
         period_end=period_end
     )
-    return WorkloadStatisticListResponse(total=len(statistics), items=statistics)
+    # 添加项目名称
+    items = []
+    for stat in statistics:
+        stat_dict = WorkloadStatisticResponse.model_validate(stat).model_dump()
+        if stat.project:
+            stat_dict['project_name'] = stat.project.name
+        items.append(WorkloadStatisticResponse(**stat_dict))
+    return WorkloadStatisticListResponse(total=len(items), items=items)

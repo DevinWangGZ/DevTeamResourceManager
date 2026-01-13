@@ -35,6 +35,18 @@
           </p>
           <p>开发人员管理工具</p>
           <div class="quick-actions">
+            <el-button type="primary" size="large" @click="goToDashboard" v-if="userStore.userInfo?.role === 'developer'">
+              <el-icon><Monitor /></el-icon>
+              个人工作台
+            </el-button>
+            <el-button type="primary" size="large" @click="goToProjectManagerDashboard" v-if="userStore.userInfo?.role === 'project_manager'">
+              <el-icon><Monitor /></el-icon>
+              项目仪表盘
+            </el-button>
+            <el-button type="primary" size="large" @click="goToTeamDashboard" v-if="userStore.userInfo?.role === 'development_lead'">
+              <el-icon><Monitor /></el-icon>
+              团队仪表盘
+            </el-button>
             <el-button type="primary" size="large" @click="goToTasks">
               <el-icon><List /></el-icon>
               任务管理
@@ -47,6 +59,10 @@
               <el-icon><DataAnalysis /></el-icon>
               工作量统计
             </el-button>
+            <el-button type="warning" size="large" @click="goToProjects">
+              <el-icon><FolderOpened /></el-icon>
+              项目管理
+            </el-button>
           </div>
         </div>
       </el-main>
@@ -58,7 +74,7 @@
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { User, ArrowDown, List, DataAnalysis } from '@element-plus/icons-vue'
+import { User, ArrowDown, List, DataAnalysis, Monitor, FolderOpened } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -90,6 +106,22 @@ const goToProfile = () => {
 
 const goToWorkload = () => {
   router.push('/workload')
+}
+
+const goToDashboard = () => {
+  router.push('/dashboard')
+}
+
+const goToProjectManagerDashboard = () => {
+  router.push('/dashboard/project-manager')
+}
+
+const goToTeamDashboard = () => {
+  router.push('/dashboard/team')
+}
+
+const goToProjects = () => {
+  router.push('/projects')
 }
 </script>
 

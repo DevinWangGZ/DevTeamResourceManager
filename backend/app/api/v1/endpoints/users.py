@@ -13,6 +13,7 @@ from app.schemas.user import (
     UserResponse,
     UserUpdate,
     UserRoleUpdate,
+    UserRolesUpdate,
     UserListResponse,
 )
 from app.services.user_service import (
@@ -20,8 +21,12 @@ from app.services.user_service import (
     get_users,
     update_user,
     update_user_role,
+    add_user_role,
+    remove_user_role,
+    set_user_roles,
     delete_user,
 )
+from app.models.role import RoleType
 from app.models.user import User
 
 router = APIRouter()
@@ -29,14 +34,17 @@ router = APIRouter()
 
 @router.get("/me", response_model=UserResponse, summary="获取当前用户信息")
 async def get_me(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     获取当前登录用户的信息
     
     需要提供有效的访问令牌
     """
-    return current_user
+    # 确保加载角色信息
+    user = get_user(db, current_user.id)
+    return UserResponse.from_user(user) if user else UserResponse.from_user(current_user)
 
 
 @router.put("/me", response_model=UserResponse, summary="更新当前用户信息")
@@ -71,12 +79,12 @@ async def list_users(
     - 项目经理：可以查看所有用户
     - 系统管理员：可以查看所有用户
     """
-    from app.models.user import UserRole
-    
-    current_user_role = UserRole(current_user.role)
-    
     # 开发人员只能查看自己的信息
-    if current_user_role == UserRole.DEVELOPER:
+    if current_user.has_role(RoleType.DEVELOPER.value) and not current_user.has_any_role([
+        RoleType.PROJECT_MANAGER.value,
+        RoleType.DEVELOPMENT_LEAD.value,
+        RoleType.SYSTEM_ADMIN.value
+    ]):
         users = [current_user]
         total = 1
     else:
@@ -89,9 +97,12 @@ async def list_users(
             is_active=is_active
         )
     
+    # 转换为UserResponse格式
+    items = [UserResponse.from_user(user) for user in users]
+    
     return {
         "total": total,
-        "items": users
+        "items": items
     }
 
 
@@ -121,7 +132,7 @@ async def get_user_detail(
             detail="无权限查看此用户信息"
         )
     
-    return user
+    return UserResponse.from_user(user)
 
 
 @router.put("/{user_id}", response_model=UserResponse, summary="更新用户信息")
@@ -137,10 +148,11 @@ async def update_user_detail(
     - 用户可以更新自己的信息
     - 管理员可以更新所有用户信息
     """
-    return update_user(db, user_id, user_update, current_user)
+    user = update_user(db, user_id, user_update, current_user)
+    return UserResponse.from_user(user)
 
 
-@router.put("/{user_id}/role", response_model=UserResponse, summary="更新用户角色")
+@router.put("/{user_id}/role", response_model=UserResponse, summary="更新用户角色（向后兼容，添加单个角色）")
 async def update_user_role_endpoint(
     user_id: int,
     role_update: UserRoleUpdate,
@@ -148,11 +160,54 @@ async def update_user_role_endpoint(
     db: Session = Depends(get_db)
 ):
     """
-    更新用户角色（仅系统管理员）
+    更新用户角色（向后兼容，仅添加单个角色）
     
     可以修改用户的角色，但不能修改自己的角色
     """
-    return update_user_role(db, user_id, role_update, current_user)
+    user = update_user_role(db, user_id, role_update, current_user)
+    return UserResponse.from_user(user)
+
+
+@router.post("/{user_id}/roles", response_model=UserResponse, summary="添加用户角色")
+async def add_user_role_endpoint(
+    user_id: int,
+    role_code: str = Query(..., description="角色代码"),
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    为用户添加角色（仅系统管理员）
+    """
+    user = add_user_role(db, user_id, role_code, current_user)
+    return UserResponse.from_user(user)
+
+
+@router.delete("/{user_id}/roles/{role_code}", response_model=UserResponse, summary="移除用户角色")
+async def remove_user_role_endpoint(
+    user_id: int,
+    role_code: str,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    移除用户角色（仅系统管理员）
+    """
+    user = remove_user_role(db, user_id, role_code, current_user)
+    return UserResponse.from_user(user)
+
+
+@router.put("/{user_id}/roles", response_model=UserResponse, summary="设置用户角色列表")
+async def set_user_roles_endpoint(
+    user_id: int,
+    roles_update: UserRolesUpdate,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    设置用户角色列表（替换所有角色，仅系统管理员）
+    """
+    user = set_user_roles(db, user_id, roles_update.role_codes, current_user)
+    return UserResponse.from_user(user)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="删除用户")
