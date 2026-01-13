@@ -28,9 +28,9 @@ class Task(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text)
     status = Column(
-        Enum(TaskStatus),
+        String(20),
         nullable=False,
-        default=TaskStatus.DRAFT,
+        default=TaskStatus.DRAFT.value,
         index=True
     )
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="SET NULL"), index=True)

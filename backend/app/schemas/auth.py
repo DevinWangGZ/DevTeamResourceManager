@@ -29,18 +29,7 @@ class UserRegister(BaseModel):
     full_name: Optional[str] = None
 
 
-class UserResponse(BaseModel):
-    """用户响应"""
-    id: int
-    username: str
-    email: str
-    full_name: Optional[str]
-    role: str
-    status_tag: Optional[str]
-    is_active: bool
-
-    class Config:
-        from_attributes = True
+# UserResponse 已移至 app.schemas.user
 
 
 class UserCreate(BaseModel):

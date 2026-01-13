@@ -34,6 +34,12 @@
             你好，{{ userStore.userInfo.full_name || userStore.userInfo.username }}！
           </p>
           <p>开发人员管理工具</p>
+          <div class="quick-actions">
+            <el-button type="primary" size="large" @click="goToTasks">
+              <el-icon><List /></el-icon>
+              任务管理
+            </el-button>
+          </div>
         </div>
       </el-main>
     </el-container>
@@ -41,10 +47,12 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { User, ArrowDown } from '@element-plus/icons-vue'
+import { User, ArrowDown, List } from '@element-plus/icons-vue'
 
+const router = useRouter()
 const userStore = useUserStore()
 
 const getRoleName = (role: string) => {
@@ -62,6 +70,10 @@ const handleCommand = (command: string) => {
     userStore.logout()
     ElMessage.success('已退出登录')
   }
+}
+
+const goToTasks = () => {
+  router.push('/tasks')
 }
 </script>
 
@@ -128,5 +140,9 @@ const handleCommand = (command: string) => {
   margin: 10px 0;
   color: #666;
   font-size: 16px;
+}
+
+.quick-actions {
+  margin-top: 30px;
 }
 </style>
