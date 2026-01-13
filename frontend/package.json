@@ -13,6 +13,7 @@
     "test:unit": "vitest"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
     "@vueuse/core": "^10.0.0",
     "axios": "^1.6.0",
     "dayjs": "^1.11.0",

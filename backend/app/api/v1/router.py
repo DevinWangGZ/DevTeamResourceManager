@@ -1,12 +1,11 @@
 """API路由聚合"""
 from fastapi import APIRouter
 
-# 后续添加各个端点路由
-# from app.api.v1.endpoints import auth, users, tasks
+from app.api.v1.endpoints import auth
 
 api_router = APIRouter()
 
-# 后续注册路由
-# api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
+# 注册路由
+api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
 # api_router.include_router(users.router, prefix="/users", tags=["用户"])
 # api_router.include_router(tasks.router, prefix="/tasks", tags=["任务"])

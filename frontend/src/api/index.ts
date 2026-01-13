@@ -30,6 +30,13 @@ request.interceptors.response.use(
   },
   (error) => {
     // 统一错误处理
+    if (error.response?.status === 401) {
+      // Token过期或无效，清除token并跳转到登录页
+      localStorage.removeItem('token')
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+    }
     console.error('API Error:', error)
     return Promise.reject(error)
   }

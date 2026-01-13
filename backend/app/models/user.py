@@ -25,9 +25,9 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(100))
     role = Column(
-        Enum(UserRole),
+        String(20),
         nullable=False,
-        default=UserRole.DEVELOPER,
+        default=UserRole.DEVELOPER.value,
         index=True
     )
     status_tag = Column(String(50))  # 趣味化情绪标签，如 "🚀火力全开"
