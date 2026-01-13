@@ -24,7 +24,7 @@ class Skill(Base):
     proficiency = Column(
         String(20),
         nullable=False,
-        default=Proficiency.FAMILIAR
+        default=Proficiency.FAMILIAR.value
     )
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())

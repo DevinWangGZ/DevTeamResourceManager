@@ -1,8 +1,19 @@
 -- DevTeam Manager 初始化数据脚本 (MySQL版本)
 -- 版本: v1.0
 -- 创建日期: 2024-05
+-- 文件编码: UTF-8
+
+-- 设置客户端连接字符集为UTF-8
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+SET character_set_connection=utf8mb4;
 
 USE devteam_manager;
+
+-- 确保当前会话使用UTF-8
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+SET character_set_connection=utf8mb4;
 
 -- ============================================
 -- 初始化测试数据
@@ -12,14 +23,15 @@ USE devteam_manager;
 -- 这里使用示例哈希值，实际部署时需要替换
 
 -- 插入测试用户（密码均为: password123）
--- 密码哈希使用 bcrypt，示例哈希值（实际使用时需要应用生成）
+-- 密码哈希使用 bcrypt，已生成正确的哈希值
+-- 生成方式: python scripts/generate_password_hash.py password123
 INSERT IGNORE INTO users (username, email, password_hash, full_name, role, status_tag) VALUES
-    ('admin', 'admin@devteam.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqJ5q5q5q5', '系统管理员', 'system_admin', '🔧系统维护'),
-    ('pm001', 'pm001@devteam.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqJ5q5q5q5', '项目经理1', 'project_manager', '📊项目管理'),
-    ('lead001', 'lead001@devteam.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqJ5q5q5q5', '开发组长1', 'development_lead', '👥团队管理'),
-    ('dev001', 'dev001@devteam.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqJ5q5q5q5', '开发人员1', 'developer', '🚀火力全开'),
-    ('dev002', 'dev002@devteam.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqJ5q5q5q5', '开发人员2', 'developer', '💻编码中'),
-    ('dev003', 'dev003@devteam.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqJ5q5q5q5', '开发人员3', 'developer', '😴休息中');
+    ('admin', 'admin@devteam.com', '$2b$12$fhgjHmubsEcrcTJATjUztOwcBl3fFbqj32zgjQAoPw0gtjBLERTda', '系统管理员', 'system_admin', '🔧系统维护'),
+    ('pm001', 'pm001@devteam.com', '$2b$12$fhgjHmubsEcrcTJATjUztOwcBl3fFbqj32zgjQAoPw0gtjBLERTda', '项目经理1', 'project_manager', '📊项目管理'),
+    ('lead001', 'lead001@devteam.com', '$2b$12$fhgjHmubsEcrcTJATjUztOwcBl3fFbqj32zgjQAoPw0gtjBLERTda', '开发组长1', 'development_lead', '👥团队管理'),
+    ('dev001', 'dev001@devteam.com', '$2b$12$fhgjHmubsEcrcTJATjUztOwcBl3fFbqj32zgjQAoPw0gtjBLERTda', '开发人员1', 'developer', '🚀火力全开'),
+    ('dev002', 'dev002@devteam.com', '$2b$12$fhgjHmubsEcrcTJATjUztOwcBl3fFbqj32zgjQAoPw0gtjBLERTda', '开发人员2', 'developer', '💻编码中'),
+    ('dev003', 'dev003@devteam.com', '$2b$12$fhgjHmubsEcrcTJATjUztOwcBl3fFbqj32zgjQAoPw0gtjBLERTda', '开发人员3', 'developer', '😴休息中');
 
 -- 插入测试项目
 INSERT IGNORE INTO projects (name, description, estimated_output_value, created_by) VALUES

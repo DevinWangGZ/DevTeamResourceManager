@@ -1,5 +1,6 @@
 <template>
   <div class="task-list-container">
+    <Breadcrumb />
     <div class="task-header">
       <h2>任务管理</h2>
       <el-button type="primary" @click="showCreateDialog = true">
@@ -289,6 +290,7 @@
 </template>
 
 <script setup lang="ts">
+import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'

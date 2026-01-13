@@ -5,10 +5,12 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from jose import JWTError
 import logging
+import json
 
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.api.v1.router import api_router
+from app.middleware.encoding import EncodingMiddleware
 
 # 配置日志
 logging.basicConfig(
@@ -23,6 +25,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# 编码中间件（确保UTF-8编码）
+app.add_middleware(EncodingMiddleware)
 
 # CORS配置
 if settings.BACKEND_CORS_ORIGINS:
@@ -43,7 +48,8 @@ async def app_exception_handler(request: Request, exc: AppException):
         content={
             "detail": exc.message,
             "code": exc.code or "APP_ERROR"
-        }
+        },
+        media_type="application/json; charset=utf-8"
     )
 
 
@@ -62,7 +68,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "detail": "请求参数验证失败",
             "code": "VALIDATION_ERROR",
             "errors": errors
-        }
+        },
+        media_type="application/json; charset=utf-8"
     )
 
 
@@ -75,7 +82,8 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={
             "detail": "服务器内部错误",
             "code": "INTERNAL_ERROR"
-        }
+        },
+        media_type="application/json; charset=utf-8"
     )
 
 # 注册路由

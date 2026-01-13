@@ -3,11 +3,22 @@
 -- 创建日期: 2024-05
 -- 数据库: devteam_manager
 -- 注意: 需要MySQL 5.7+或8.0+，使用InnoDB存储引擎
+-- 文件编码: UTF-8
+
+-- 设置客户端连接字符集为UTF-8
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+SET character_set_connection=utf8mb4;
 
 -- 创建数据库（如果不存在）
 CREATE DATABASE IF NOT EXISTS devteam_manager DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE devteam_manager;
+
+-- 确保当前会话使用UTF-8
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+SET character_set_connection=utf8mb4;
 
 -- ============================================
 -- 1. 用户表 (users)

@@ -50,7 +50,7 @@ class Settings(BaseSettings):
             return (
                 f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
                 f"@{self.MYSQL_SERVER}:{self.MYSQL_PORT}/{self.MYSQL_DB}"
-                f"?charset=utf8mb4"
+                f"?charset=utf8mb4&use_unicode=1"
             )
         elif self.DATABASE_TYPE == "postgresql":
             return (

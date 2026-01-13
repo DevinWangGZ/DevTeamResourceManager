@@ -39,6 +39,14 @@
               <el-icon><List /></el-icon>
               任务管理
             </el-button>
+            <el-button type="success" size="large" @click="goToProfile">
+              <el-icon><User /></el-icon>
+              个人档案
+            </el-button>
+            <el-button type="info" size="large" @click="goToWorkload">
+              <el-icon><DataAnalysis /></el-icon>
+              工作量统计
+            </el-button>
           </div>
         </div>
       </el-main>
@@ -74,6 +82,14 @@ const handleCommand = (command: string) => {
 
 const goToTasks = () => {
   router.push('/tasks')
+}
+
+const goToProfile = () => {
+  router.push('/profile')
+}
+
+const goToWorkload = () => {
+  router.push('/workload')
 }
 </script>
 

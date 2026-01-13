@@ -13,6 +13,7 @@ elif settings.DATABASE_TYPE == "mysql":
     # MySQL连接参数
     connect_args = {
         "charset": "utf8mb4",
+        "use_unicode": True,
         "connect_timeout": 10,
     }
 

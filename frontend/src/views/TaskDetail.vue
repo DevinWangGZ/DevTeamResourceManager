@@ -1,5 +1,6 @@
 <template>
   <div class="task-detail-container">
+    <Breadcrumb />
     <el-card v-loading="loading">
       <template #header>
         <div class="task-header">
@@ -177,6 +178,7 @@
 </template>
 
 <script setup lang="ts">
+import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'

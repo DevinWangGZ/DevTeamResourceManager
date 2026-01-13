@@ -27,6 +27,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/TaskDetail.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('@/views/Profile.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/workload',
+    name: 'WorkloadStatistics',
+    component: () => import('@/views/WorkloadStatistics.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

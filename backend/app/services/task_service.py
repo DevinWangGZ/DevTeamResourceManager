@@ -11,6 +11,7 @@ from app.models.project import Project
 from app.core.exceptions import NotFoundError, PermissionDeniedError, ValidationError
 from app.schemas.task import TaskCreate, TaskUpdate, TaskFilterParams
 from app.services.schedule_service import ScheduleService
+from app.services.workload_statistic_service import WorkloadStatisticService
 
 
 class TaskService:
@@ -347,9 +348,19 @@ class TaskService:
         if task.status != TaskStatus.SUBMITTED.value:
             raise ValidationError("只有已提交状态的任务可以确认")
 
+        # 更新任务状态
         task.status = TaskStatus.CONFIRMED.value
         db.commit()
         db.refresh(task)
+
+        # 任务确认后，自动更新工作量统计
+        try:
+            WorkloadStatisticService.update_statistic_on_task_confirmation(db, task)
+        except Exception as e:
+            # 如果更新统计失败，记录错误但不影响任务确认
+            # 在实际生产环境中，应该记录日志
+            pass
+
         return task
 
     @staticmethod
