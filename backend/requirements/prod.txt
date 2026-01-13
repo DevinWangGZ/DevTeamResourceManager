@@ -1,0 +1,4 @@
+-r base.txt
+
+# 生产环境额外依赖
+gunicorn>=21.2.0

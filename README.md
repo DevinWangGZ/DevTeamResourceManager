@@ -40,40 +40,50 @@ DevTeam Manager 是一个专为开发团队设计的资源管理与协作平台�
 ### 环境要求
 
 - Node.js 18.0+
-- Python 3.12+
+- Python 3.12+ (当前使用 3.13.9)
 - PostgreSQL 15+（生产环境）或 SQLite（开发环境）
+- Docker & Docker Compose（可选，用于PostgreSQL）
 
-### 安装步骤
+### 快速启动
 
-1. **克隆仓库**
-   ```bash
-   git clone <repository-url>
-   cd DevTeamResourceManager
-   ```
+**详细步骤请参考**：[快速启动指南](./SETUP.md)
 
-2. **后端设置**
-   ```bash
-   cd backend
-   pip install -r requirements/dev.txt
-   cp .env.example .env
-   # 编辑 .env 文件，配置数据库等信息
-   alembic upgrade head
-   uvicorn app.main:app --reload
-   ```
+#### 使用Makefile（推荐）
 
-3. **前端设置**
-   ```bash
-   cd frontend
-   npm install
-   cp .env.example .env.development
-   # 编辑 .env.development 文件，配置API地址
-   npm run dev
-   ```
+```bash
+# 安装所有依赖
+make install
 
-4. **访问应用**
-   - 前端：http://localhost:5173
-   - 后端API：http://localhost:8000
-   - API文档：http://localhost:8000/docs
+# 启动后端（新终端）
+make dev-backend
+
+# 启动前端（新终端）
+make dev-frontend
+```
+
+#### 手动启动
+
+**后端：**
+```bash
+cd backend
+pip install -r requirements/dev.txt
+cp .env.example .env
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**前端：**
+```bash
+cd frontend
+npm install
+cp .env.example .env.development
+npm run dev
+```
+
+### 访问应用
+
+- **前端**：http://localhost:5173
+- **后端API**：http://localhost:8000
+- **API文档**：http://localhost:8000/docs
 
 ## 📁 项目结构
 
@@ -110,6 +120,7 @@ DevTeamResourceManager/
 ### 需求文档
 - [需求规格说明书](./docs/requirements/SPECIFICATION.md)
 - [用户故事](./docs/requirements/USER_STORIES.md)
+- [实施路线图](./docs/IMPLEMENTATION_ROADMAP.md)
 
 ## 🧪 测试
 
