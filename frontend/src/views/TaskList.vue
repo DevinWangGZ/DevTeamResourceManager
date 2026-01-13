@@ -171,7 +171,7 @@
               link
               type="primary"
               size="small"
-              @click="showSubmitDialog(row)"
+              @click="showSubmitDialogFunc(row)"
             >
               提交
             </el-button>
@@ -346,6 +346,7 @@ const showEvaluateDialog = ref(false)
 const currentEvaluateTask = ref<Task | null>(null)
 
 const showSubmitDialog = ref(false)
+const currentSubmitTask = ref<Task | null>(null)
 const submitLoading = ref(false)
 const submitFormRef = ref<FormInstance>()
 const submitForm = reactive({
@@ -578,19 +579,19 @@ const handleEvaluate = async (accept: boolean) => {
 }
 
 const showSubmitDialogFunc = (task: Task) => {
-  currentEvaluateTask.value = task
+  currentSubmitTask.value = task
   submitForm.actual_man_days = task.estimated_man_days || 0
   showSubmitDialog.value = true
 }
 
 const handleSubmit = async () => {
-  if (!submitFormRef.value || !currentEvaluateTask.value) return
+  if (!submitFormRef.value || !currentSubmitTask.value) return
 
   await submitFormRef.value.validate(async (valid) => {
     if (valid) {
       submitLoading.value = true
       try {
-        await submitTask(currentEvaluateTask.value!.id, {
+        await submitTask(currentSubmitTask.value!.id, {
           actual_man_days: submitForm.actual_man_days,
         })
         ElMessage.success('任务提交成功')
@@ -608,6 +609,7 @@ const handleSubmit = async () => {
 const resetSubmitForm = () => {
   submitFormRef.value?.resetFields()
   submitForm.actual_man_days = 0
+  currentSubmitTask.value = null
 }
 
 const handleConfirm = async (taskId: number) => {

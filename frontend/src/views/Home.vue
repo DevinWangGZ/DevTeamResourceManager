@@ -58,7 +58,7 @@
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { User, ArrowDown, List } from '@element-plus/icons-vue'
+import { User, ArrowDown, List, DataAnalysis } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
