@@ -94,7 +94,7 @@
             <span>任务描述</span>
           </template>
           <div class="description-content">
-            <p v-if="task.description">{{ task.description }}</p>
+            <MarkdownViewer v-if="task.description" :content="task.description" />
             <p v-else class="text-muted">暂无描述</p>
           </div>
         </el-card>
@@ -179,6 +179,7 @@
 
 <script setup lang="ts">
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
+import MarkdownViewer from '@/components/ui/MarkdownViewer.vue'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
@@ -263,10 +264,25 @@ const getSkillsList = (skills?: string) => {
 }
 
 const canPublish = computed(() => {
-  return (
-    task.value?.status === 'draft' &&
-    (userStore.userInfo?.role === 'project_manager' || userStore.userInfo?.role === 'system_admin')
-  )
+  if (!task.value || !userStore.userInfo) return false
+  // 只有任务的创建者（且是项目经理或系统管理员）才能发布草稿状态的任务
+  const isCreator = task.value.creator_id === userStore.userInfo.id
+  const isManager = userStore.userInfo.role === 'project_manager' || userStore.userInfo.role === 'system_admin'
+  const isDraft = task.value.status === 'draft'
+  
+  // 调试信息（开发环境）
+  if (import.meta.env.DEV) {
+    console.debug('发布按钮显示条件:', {
+      isDraft,
+      isCreator,
+      isManager,
+      creatorId: task.value.creator_id,
+      currentUserId: userStore.userInfo.id,
+      currentUserRole: userStore.userInfo.role,
+    })
+  }
+  
+  return isDraft && isCreator && isManager
 })
 
 const canClaim = computed(() => {

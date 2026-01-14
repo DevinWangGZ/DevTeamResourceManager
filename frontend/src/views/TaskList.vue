@@ -3,7 +3,7 @@
     <Breadcrumb />
     <div class="task-header">
       <h2>任务管理</h2>
-      <el-button type="primary" @click="showCreateDialog = true">
+      <el-button type="primary" @click="goToCreate">
         <el-icon><Plus /></el-icon>
         创建任务
       </el-button>
@@ -211,72 +211,6 @@
       </div>
     </el-card>
 
-    <!-- 创建任务对话框 -->
-    <el-dialog
-      v-model="showCreateDialog"
-      title="创建任务"
-      width="600px"
-      @close="resetCreateForm"
-    >
-      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="100px">
-        <el-form-item label="任务标题" prop="title">
-          <el-input v-model="createForm.title" placeholder="请输入任务标题" />
-        </el-form-item>
-        <el-form-item label="所属项目" prop="project_id">
-          <el-select
-            v-model="createForm.project_id"
-            placeholder="请选择项目"
-            filterable
-            style="width: 100%"
-            clearable
-            :loading="projectLoading"
-          >
-            <el-option
-              v-for="project in projectList"
-              :key="project.id"
-              :label="project.name"
-              :value="project.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="任务描述" prop="description">
-          <el-input
-            v-model="createForm.description"
-            type="textarea"
-            :rows="4"
-            placeholder="请输入任务描述"
-          />
-        </el-form-item>
-        <el-form-item label="拟投入人天" prop="estimated_man_days">
-          <el-input-number
-            v-model="createForm.estimated_man_days"
-            :min="0"
-            :precision="2"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="所需技能" prop="required_skills">
-          <el-input
-            v-model="createForm.required_skills"
-            placeholder="请输入所需技能（逗号分隔）"
-          />
-        </el-form-item>
-        <el-form-item label="截止时间" prop="deadline">
-          <el-date-picker
-            v-model="createForm.deadline"
-            type="date"
-            placeholder="选择截止时间"
-            style="width: 100%"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" :loading="createLoading" @click="handleCreate">
-          创建
-        </el-button>
-      </template>
-    </el-dialog>
 
     <!-- 评估任务对话框 -->
     <el-dialog v-model="showEvaluateDialog" title="评估任务" width="500px">
@@ -323,14 +257,12 @@ import { Plus, Search } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import {
   getTasks,
-  createTask,
   claimTask,
   evaluateTask,
   submitTask,
   confirmTask,
   deleteTask,
   type Task,
-  type TaskCreate,
 } from '@/api/task'
 import { getProjects, type Project } from '@/api/project'
 import { useRouter } from 'vue-router'
@@ -360,17 +292,6 @@ const filterForm = reactive({
   is_pinned: undefined as boolean | undefined,
 })
 
-const showCreateDialog = ref(false)
-const createLoading = ref(false)
-const createFormRef = ref<FormInstance>()
-const createForm = reactive<TaskCreate>({
-  title: '',
-  description: '',
-  project_id: undefined,
-  estimated_man_days: 0,
-  required_skills: '',
-})
-
 const showEvaluateDialog = ref(false)
 const currentEvaluateTask = ref<Task | null>(null)
 
@@ -385,11 +306,6 @@ const submitFormRef = ref<FormInstance>()
 const submitForm = reactive({
   actual_man_days: 0,
 })
-
-const createRules: FormRules = {
-  title: [{ required: true, message: '请输入任务标题', trigger: 'blur' }],
-  estimated_man_days: [{ required: true, message: '请输入拟投入人天', trigger: 'blur' }],
-}
 
 const submitRules: FormRules = {
   actual_man_days: [{ required: true, message: '请输入实际投入人天', trigger: 'blur' }],
@@ -550,38 +466,6 @@ const resetFilter = () => {
   loadTasks()
 }
 
-const handleCreate = async () => {
-  if (!createFormRef.value) return
-
-  await createFormRef.value.validate(async (valid) => {
-    if (valid) {
-      createLoading.value = true
-      try {
-        await createTask(createForm)
-        ElMessage.success('任务创建成功')
-        showCreateDialog.value = false
-        loadTasks()
-      } catch (error: any) {
-        ElMessage.error(error.response?.data?.detail || '创建任务失败')
-      } finally {
-        createLoading.value = false
-      }
-    }
-  })
-}
-
-const resetCreateForm = () => {
-  createFormRef.value?.resetFields()
-  Object.assign(createForm, {
-    title: '',
-    description: '',
-    project_id: undefined,
-    estimated_man_days: 0,
-    required_skills: '',
-    deadline: undefined,
-  })
-}
-
 const loadProjects = async () => {
   projectLoading.value = true
   try {
@@ -684,6 +568,10 @@ const viewTask = (taskId: number) => {
   router.push({ name: 'TaskDetail', params: { id: taskId } })
 }
 
+const goToCreate = () => {
+  router.push({ name: 'TaskCreate' })
+}
+
 const handleDelete = async (task: Task) => {
   try {
     await ElMessageBox.confirm(
@@ -707,7 +595,6 @@ const handleDelete = async (task: Task) => {
 
 onMounted(() => {
   loadTasks()
-  loadProjects()
 })
 </script>
 

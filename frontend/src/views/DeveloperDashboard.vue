@@ -161,6 +161,17 @@
       </div>
     </el-card>
 
+    <!-- 工作负荷可视化 -->
+    <el-card class="workload-card" style="margin-top: 20px">
+      <template #header>
+        <div class="card-header">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>工作负荷</span>
+        </div>
+      </template>
+      <WorkloadTimeline title="" />
+    </el-card>
+
     <!-- 快速操作 -->
     <el-card class="quick-actions-card" style="margin-top: 20px">
       <template #header>
@@ -201,6 +212,7 @@ import {
   User,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
+import WorkloadTimeline from '@/components/business/WorkloadTimeline.vue'
 import { getDeveloperDashboard, type DeveloperDashboard } from '@/api/dashboard'
 
 const router = useRouter()

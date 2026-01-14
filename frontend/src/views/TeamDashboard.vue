@@ -120,6 +120,28 @@
       </div>
     </el-card>
 
+    <!-- 团队负荷可视化 -->
+    <el-card class="workload-card" style="margin-top: 20px" v-loading="loading">
+      <template #header>
+        <div class="card-header">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>团队负荷分布</span>
+        </div>
+      </template>
+      <div v-if="dashboardData?.member_summaries && dashboardData.member_summaries.length > 0">
+        <WorkloadChart
+          type="bar"
+          :data="teamWorkloadChartData"
+          title=""
+          series-name="投入人天"
+          height="300px"
+        />
+      </div>
+      <div v-else class="empty-state">
+        <el-empty description="暂无团队负荷数据" :image-size="100" />
+      </div>
+    </el-card>
+
     <!-- 待办提醒 -->
     <el-card class="todo-card" style="margin-top: 20px" v-loading="loading">
       <template #header>
@@ -174,7 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -187,11 +209,21 @@ import {
   TrendCharts,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
+import WorkloadChart from '@/components/business/WorkloadChart.vue'
 import { getTeamDashboard, type TeamDashboard } from '@/api/dashboard'
 
 const router = useRouter()
 const loading = ref(false)
 const dashboardData = ref<TeamDashboard | null>(null)
+
+// 团队负荷图表数据
+const teamWorkloadChartData = computed(() => {
+  if (!dashboardData.value?.member_summaries) return []
+  return dashboardData.value.member_summaries.map((member) => ({
+    name: member.full_name || member.username,
+    total_man_days: parseFloat(member.total_man_days.toString()),
+  }))
+})
 
 const getCompletionRateColor = (rate: number) => {
   if (rate >= 80) return '#67c23a'

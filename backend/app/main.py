@@ -3,6 +3,8 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from jose import JWTError
 import logging
 import json
@@ -11,6 +13,7 @@ from app.core.config import settings
 from app.core.exceptions import AppException
 from app.api.v1.router import api_router
 from app.middleware.encoding import EncodingMiddleware
+from app.utils.paths import get_uploads_dir, get_uploads_images_dir
 
 # 配置日志
 logging.basicConfig(
@@ -86,7 +89,19 @@ async def general_exception_handler(request: Request, exc: Exception):
         media_type="application/json; charset=utf-8"
     )
 
-# 注册路由
+# 配置静态文件服务（用于访问上传的图片）
+# 注意：静态文件服务必须在路由注册之前配置，否则会被路由拦截
+uploads_base_dir = get_uploads_dir()
+uploads_images_dir = get_uploads_images_dir()
+
+# 挂载静态文件服务
+try:
+    app.mount("/uploads", StaticFiles(directory=str(uploads_base_dir)), name="uploads")
+    logger.info(f"静态文件服务已挂载: {uploads_base_dir}")
+except Exception as e:
+    logger.warning(f"静态文件服务挂载失败: {e}")
+
+# 注册路由（必须在静态文件服务之后）
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 

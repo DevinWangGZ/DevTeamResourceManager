@@ -72,6 +72,64 @@
         </el-row>
       </el-card>
 
+      <!-- 数据可视化 -->
+      <el-row :gutter="20" style="margin-top: 20px" v-if="statisticList.length > 0">
+        <!-- 工作量趋势图 -->
+        <el-col :span="24">
+          <el-card>
+            <template #header>
+              <div class="card-header">
+                <span>工作量趋势</span>
+                <el-radio-group v-model="trendViewType" size="small" @change="updateTrendChart">
+                  <el-radio-button label="month">按月</el-radio-button>
+                  <el-radio-button label="project">按项目</el-radio-button>
+                </el-radio-group>
+              </div>
+            </template>
+            <WorkloadChart
+              type="trend"
+              :data="trendChartData"
+              :x-axis-data="trendXAxisData"
+              title=""
+              series-name="投入人天"
+              height="300px"
+            />
+          </el-card>
+        </el-col>
+
+        <!-- 按项目统计 -->
+        <el-col :span="12" style="margin-top: 20px">
+          <el-card>
+            <template #header>
+              <span>按项目统计</span>
+            </template>
+            <WorkloadChart
+              type="bar"
+              :data="projectChartData"
+              title=""
+              series-name="投入人天"
+              height="300px"
+            />
+          </el-card>
+        </el-col>
+
+        <!-- 项目占比 -->
+        <el-col :span="12" style="margin-top: 20px">
+          <el-card>
+            <template #header>
+              <span>项目占比</span>
+            </template>
+            <WorkloadChart
+              type="pie"
+              :data="projectChartData"
+              title=""
+              series-name="投入人天"
+              height="300px"
+            />
+          </el-card>
+        </el-col>
+      </el-row>
+
       <!-- 统计列表 -->
       <el-table
         :data="statisticList"
@@ -123,9 +181,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
+import WorkloadChart from '@/components/business/WorkloadChart.vue'
 import {
   getMyWorkloadStatistics,
   getMyWorkloadSummary,
@@ -145,6 +204,59 @@ const filters = reactive({
   period_start: undefined as string | undefined,
   period_end: undefined as string | undefined,
 })
+
+const trendViewType = ref<'month' | 'project'>('month')
+
+// 趋势图数据
+const trendChartData = computed(() => {
+  if (trendViewType.value === 'month') {
+    // 按月统计
+    const monthMap = new Map<string, number>()
+    statisticList.value.forEach((item) => {
+      const date = new Date(item.period_start)
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const current = monthMap.get(monthKey) || 0
+      monthMap.set(monthKey, current + parseFloat(item.total_man_days.toString()))
+    })
+    return Array.from(monthMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, value]) => ({
+        period_start: key + '-01',
+        total_man_days: value,
+      }))
+  } else {
+    // 按项目统计（用于趋势图）
+    return statisticList.value
+  }
+})
+
+const trendXAxisData = computed(() => {
+  return trendChartData.value.map((item: any) => {
+    if (item.period_start) {
+      const date = new Date(item.period_start)
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    }
+    return item.project_name || ''
+  })
+})
+
+// 按项目统计图表数据
+const projectChartData = computed(() => {
+  const projectMap = new Map<string, number>()
+  statisticList.value.forEach((item) => {
+    const projectName = item.project_name || `项目${item.project_id || '未知'}`
+    const current = projectMap.get(projectName) || 0
+    projectMap.set(projectName, current + parseFloat(item.total_man_days.toString()))
+  })
+  return Array.from(projectMap.entries()).map(([name, value]) => ({
+    project_name: name,
+    total_man_days: value,
+  }))
+})
+
+const updateTrendChart = () => {
+  // 图表会自动更新，因为使用了computed
+}
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return ''
@@ -273,5 +385,11 @@ onMounted(() => {
   font-size: 24px;
   font-weight: bold;
   color: #409eff;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>
