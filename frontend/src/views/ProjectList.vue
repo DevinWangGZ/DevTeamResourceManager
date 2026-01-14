@@ -65,10 +65,19 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="viewProject(row.id)">
               查看
+            </el-button>
+            <el-button
+              v-if="canViewTasks(row)"
+              link
+              type="success"
+              size="small"
+              @click="viewProjectTasks(row.id)"
+            >
+              任务执行
             </el-button>
             <el-button
               v-if="canEdit(row)"
@@ -438,6 +447,15 @@ const viewProject = (projectId: number) => {
     // 如果路由不存在，显示项目详情对话框
     showProjectDetail(projectId)
   })
+}
+
+const viewProjectTasks = (projectId: number) => {
+  router.push({ name: 'ProjectTaskExecution', params: { id: projectId } })
+}
+
+const canViewTasks = (project: Project) => {
+  // 项目经理和管理员可以查看任务执行视图
+  return userStore.userInfo?.role === 'project_manager' || userStore.userInfo?.role === 'system_admin'
 }
 
 const showProjectDetail = async (projectId: number) => {

@@ -68,6 +68,53 @@
       </el-col>
     </el-row>
 
+    <!-- 项目进度和任务完成情况图表 -->
+    <el-row :gutter="20" style="margin-top: 20px">
+      <el-col :span="12">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <el-icon><FolderOpened /></el-icon>
+              <span>项目任务完成情况</span>
+            </div>
+          </template>
+          <WorkloadChart
+            v-if="dashboardData?.project_summaries && dashboardData.project_summaries.length > 0"
+            type="bar"
+            :data="projectTaskChartData"
+            title=""
+            height="300px"
+            series-name="已完成任务"
+          />
+          <div v-else class="empty-state">
+            <el-empty description="暂无项目数据" :image-size="80" />
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :span="12">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <el-icon><Money /></el-icon>
+              <span>项目产值对比</span>
+            </div>
+          </template>
+          <WorkloadChart
+            v-if="dashboardData?.output_summaries && dashboardData.output_summaries.length > 0"
+            type="bar"
+            :data="projectOutputChartData"
+            title=""
+            height="300px"
+            series-name="已分配产值"
+          />
+          <div v-else class="empty-state">
+            <el-empty description="暂无产值数据" :image-size="80" />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <!-- 项目产值汇总 -->
     <el-card class="output-card" style="margin-top: 20px" v-loading="loading">
       <template #header>
@@ -172,7 +219,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -185,11 +232,32 @@ import {
   Refresh,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
-import { getProjectManagerDashboard, type ProjectManagerDashboard } from '@/api/dashboard'
+import WorkloadChart from '@/components/business/WorkloadChart.vue'
+import { getProjectManagerDashboard, type ProjectManagerDashboard, type ProjectOutputSummary } from '@/api/dashboard'
+import { computed } from 'vue'
 
 const router = useRouter()
 const loading = ref(false)
 const dashboardData = ref<ProjectManagerDashboard | null>(null)
+
+// 项目任务完成情况图表数据（堆叠柱状图需要特殊处理）
+const projectTaskChartData = computed(() => {
+  if (!dashboardData.value?.project_summaries) return []
+  // 返回已完成任务数用于展示
+  return dashboardData.value.project_summaries.map(project => ({
+    name: project.project_name,
+    value: project.completed_tasks,
+  }))
+})
+
+// 项目产值对比图表数据
+const projectOutputChartData = computed(() => {
+  if (!dashboardData.value?.output_summaries) return []
+  return dashboardData.value.output_summaries.map(output => ({
+    name: output.project_name,
+    value: parseFloat(output.allocated_output_value.toString()),
+  }))
+})
 
 const formatMoney = (amount: number) => {
   return new Intl.NumberFormat('zh-CN', {
@@ -385,5 +453,9 @@ onMounted(() => {
 .quick-actions .el-button {
   flex: 1;
   min-width: 150px;
+}
+
+.chart-card {
+  height: 100%;
 }
 </style>

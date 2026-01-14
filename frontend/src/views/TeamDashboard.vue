@@ -121,26 +121,53 @@
     </el-card>
 
     <!-- 团队负荷可视化 -->
-    <el-card class="workload-card" style="margin-top: 20px" v-loading="loading">
-      <template #header>
-        <div class="card-header">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>团队负荷分布</span>
-        </div>
-      </template>
-      <div v-if="dashboardData?.member_summaries && dashboardData.member_summaries.length > 0">
-        <WorkloadChart
-          type="bar"
-          :data="teamWorkloadChartData"
-          title=""
-          series-name="投入人天"
-          height="300px"
-        />
-      </div>
-      <div v-else class="empty-state">
-        <el-empty description="暂无团队负荷数据" :image-size="100" />
-      </div>
-    </el-card>
+    <el-row :gutter="20" style="margin-top: 20px">
+      <el-col :span="12">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <el-icon><DataAnalysis /></el-icon>
+              <span>团队负荷分布</span>
+            </div>
+          </template>
+          <div v-if="dashboardData?.member_summaries && dashboardData.member_summaries.length > 0">
+            <WorkloadChart
+              type="bar"
+              :data="teamWorkloadChartData"
+              title=""
+              series-name="投入人天"
+              height="300px"
+            />
+          </div>
+          <div v-else class="empty-state">
+            <el-empty description="暂无团队负荷数据" :image-size="100" />
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :span="12">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <el-icon><UserFilled /></el-icon>
+              <span>团队成员负荷状态</span>
+            </div>
+          </template>
+          <div v-if="dashboardData?.member_summaries && dashboardData.member_summaries.length > 0">
+            <WorkloadChart
+              type="pie"
+              :data="workloadStatusChartData"
+              title=""
+              series-name="人数"
+              height="300px"
+            />
+          </div>
+          <div v-else class="empty-state">
+            <el-empty description="暂无负荷状态数据" :image-size="100" />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <!-- 待办提醒 -->
     <el-card class="todo-card" style="margin-top: 20px" v-loading="loading">
@@ -222,6 +249,20 @@ const teamWorkloadChartData = computed(() => {
   return dashboardData.value.member_summaries.map((member) => ({
     name: member.full_name || member.username,
     total_man_days: parseFloat(member.total_man_days.toString()),
+  }))
+})
+
+// 负荷状态分布图表数据
+const workloadStatusChartData = computed(() => {
+  if (!dashboardData.value?.member_summaries) return []
+  const statusCount: Record<string, number> = {}
+  dashboardData.value.member_summaries.forEach(member => {
+    const status = member.workload_status
+    statusCount[status] = (statusCount[status] || 0) + 1
+  })
+  return Object.entries(statusCount).map(([status, count]) => ({
+    name: getWorkloadStatusText(status),
+    value: count,
   }))
 })
 
@@ -397,5 +438,9 @@ onMounted(() => {
 .quick-actions .el-button {
   flex: 1;
   min-width: 150px;
+}
+
+.chart-card {
+  height: 100%;
 }
 </style>

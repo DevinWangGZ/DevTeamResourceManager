@@ -69,3 +69,49 @@ export function updateProject(projectId: number, data: ProjectUpdate): Promise<P
 export function deleteProject(projectId: number): Promise<void> {
   return request.delete(`/api/v1/projects/${projectId}`)
 }
+
+export interface ProjectTask {
+  id: number
+  title: string
+  description?: string
+  status: string
+  creator_id: number
+  creator_name?: string
+  assignee_id?: number
+  assignee_name?: string
+  estimated_man_days: number
+  actual_man_days?: number
+  required_skills?: string
+  deadline?: string
+  is_pinned: boolean
+  created_at?: string
+  updated_at?: string
+  schedule?: {
+    start_date?: string
+    end_date?: string
+    work_days: number
+    is_pinned: boolean
+  }
+}
+
+export interface ProjectTaskExecutionResponse {
+  project_id: number
+  project_name: string
+  tasks: ProjectTask[]
+  status_summary: Record<string, number>
+  total: number
+}
+
+/**
+ * 获取项目任务执行视图数据
+ */
+export function getProjectTasks(
+  projectId: number,
+  params?: {
+    status?: string
+    assignee_id?: number
+    keyword?: string
+  }
+): Promise<ProjectTaskExecutionResponse> {
+  return request.get(`/api/v1/projects/${projectId}/tasks`, { params })
+}

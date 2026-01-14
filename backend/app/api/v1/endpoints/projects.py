@@ -119,3 +119,105 @@ async def delete_project(
         ProjectService.delete_project(db, project_id, current_user.id)
     except (NotFoundError, PermissionDeniedError) as e:
         raise HTTPException(status_code=404 if isinstance(e, NotFoundError) else 403, detail=str(e))
+
+
+@router.get("/{project_id}/tasks", response_model=dict)
+async def get_project_tasks(
+    project_id: int,
+    status: Optional[str] = Query(None, description="任务状态"),
+    assignee_id: Optional[int] = Query(None, description="认领者ID"),
+    keyword: Optional[str] = Query(None, description="关键词搜索"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取项目任务执行视图数据"""
+    from app.models.task import Task, TaskStatus
+    from app.models.task_schedule import TaskSchedule
+    from sqlalchemy.orm import joinedload
+    from sqlalchemy import or_
+    
+    # 检查项目是否存在
+    project = ProjectService.get_project(db, project_id)
+    if not project:
+        raise NotFoundError("项目不存在")
+    
+    # 权限检查：项目经理只能查看自己创建的项目
+    if current_user.role == "project_manager" and project.created_by != current_user.id:
+        raise PermissionDeniedError("只能查看自己创建的项目")
+    
+    # 构建查询
+    query = db.query(Task).options(
+        joinedload(Task.creator),
+        joinedload(Task.assignee),
+        joinedload(Task.project)
+    ).filter(Task.project_id == project_id)
+    
+    # 状态筛选
+    if status:
+        query = query.filter(Task.status == status)
+    
+    # 认领者筛选
+    if assignee_id:
+        query = query.filter(Task.assignee_id == assignee_id)
+    
+    # 关键词搜索
+    if keyword:
+        keyword_pattern = f"%{keyword}%"
+        query = query.filter(
+            or_(
+                Task.title.like(keyword_pattern),
+                Task.description.like(keyword_pattern)
+            )
+        )
+    
+    # 获取所有任务
+    tasks = query.order_by(Task.created_at.desc()).all()
+    
+    # 构建响应数据
+    tasks_data = []
+    for task in tasks:
+        task_data = {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "status": task.status,
+            "creator_id": task.creator_id,
+            "creator_name": task.creator.full_name or task.creator.username if task.creator else None,
+            "assignee_id": task.assignee_id,
+            "assignee_name": task.assignee.full_name or task.assignee.username if task.assignee else None,
+            "estimated_man_days": float(task.estimated_man_days) if task.estimated_man_days else 0,
+            "actual_man_days": float(task.actual_man_days) if task.actual_man_days else None,
+            "required_skills": task.required_skills,
+            "deadline": task.deadline.isoformat() if task.deadline else None,
+            "is_pinned": task.is_pinned,
+            "created_at": task.created_at.isoformat() if task.created_at else None,
+            "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+        }
+        
+        # 获取排期信息
+        schedule = db.query(TaskSchedule).filter(TaskSchedule.task_id == task.id).first()
+        if schedule:
+            task_data["schedule"] = {
+                "start_date": schedule.start_date.isoformat() if schedule.start_date else None,
+                "end_date": schedule.end_date.isoformat() if schedule.end_date else None,
+                "work_days": schedule.work_days,
+                "is_pinned": schedule.is_pinned,
+            }
+        
+        tasks_data.append(task_data)
+    
+    # 按状态分组统计
+    status_summary = {}
+    for task in tasks:
+        status = task.status
+        if status not in status_summary:
+            status_summary[status] = 0
+        status_summary[status] += 1
+    
+    return {
+        "project_id": project_id,
+        "project_name": project.name,
+        "tasks": tasks_data,
+        "status_summary": status_summary,
+        "total": len(tasks_data)
+    }

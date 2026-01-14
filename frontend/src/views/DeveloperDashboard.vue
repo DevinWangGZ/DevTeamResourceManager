@@ -161,6 +161,52 @@
       </div>
     </el-card>
 
+    <!-- 任务统计图表 -->
+    <el-row :gutter="20" style="margin-top: 20px">
+      <el-col :span="12">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <el-icon><List /></el-icon>
+              <span>任务状态分布</span>
+            </div>
+          </template>
+          <WorkloadChart
+            v-if="dashboardData?.task_summary"
+            type="pie"
+            :data="taskStatusChartData"
+            title=""
+            height="300px"
+            series-name="任务数"
+          />
+        </el-card>
+      </el-col>
+
+      <!-- 工作量概览图表 -->
+      <el-col :span="12">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <el-icon><DataAnalysis /></el-icon>
+              <span>工作量趋势</span>
+            </div>
+          </template>
+          <div v-if="workloadTrendData.length > 0">
+            <WorkloadChart
+              type="line"
+              :data="workloadTrendData"
+              title=""
+              height="300px"
+              series-name="投入人天"
+            />
+          </div>
+          <div v-else class="empty-state">
+            <el-empty description="暂无工作量趋势数据" :image-size="80" />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <!-- 工作负荷可视化 -->
     <el-card class="workload-card" style="margin-top: 20px">
       <template #header>
@@ -199,7 +245,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -213,11 +259,32 @@ import {
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadTimeline from '@/components/business/WorkloadTimeline.vue'
+import WorkloadChart from '@/components/business/WorkloadChart.vue'
 import { getDeveloperDashboard, type DeveloperDashboard } from '@/api/dashboard'
+import { computed } from 'vue'
 
 const router = useRouter()
 const loading = ref(false)
 const dashboardData = ref<DeveloperDashboard | null>(null)
+
+// 任务状态分布图表数据
+const taskStatusChartData = computed(() => {
+  if (!dashboardData.value?.task_summary) return []
+  const summary = dashboardData.value.task_summary
+  return [
+    { name: '进行中', value: summary.in_progress },
+    { name: '已提交', value: summary.submitted },
+    { name: '已确认', value: summary.confirmed },
+    { name: '待评估', value: summary.pending_eval },
+  ].filter(item => item.value > 0)
+})
+
+// 工作量趋势数据（模拟数据，实际应从API获取）
+const workloadTrendData = computed(() => {
+  // TODO: 从API获取工作量趋势数据
+  // 目前返回空数组，后续需要添加API接口
+  return []
+})
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return ''
@@ -421,5 +488,9 @@ onMounted(() => {
 .quick-actions .el-button {
   flex: 1;
   min-width: 150px;
+}
+
+.chart-card {
+  height: 100%;
 }
 </style>
