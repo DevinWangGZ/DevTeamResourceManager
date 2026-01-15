@@ -336,8 +336,7 @@ const getReminderType = (type: string) => {
   const typeMap: Record<string, string> = {
     pending_eval: 'warning',
     submitted: 'info',
-    over_budget: 'danger',
-    overloaded_members: 'danger',
+    upcoming_deadline: 'danger',
   }
   return typeMap[type] || 'info'
 }

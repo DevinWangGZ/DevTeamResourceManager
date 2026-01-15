@@ -97,6 +97,29 @@ class DashboardService:
                 count=submitted,
                 link="/tasks?status=submitted"
             ))
+        
+        # 即将到期任务提醒（3天内到期）
+        from app.models.task_schedule import TaskSchedule
+        from datetime import timedelta
+        today = date.today()
+        three_days_later = today + timedelta(days=3)
+        
+        upcoming_deadline_tasks = db.query(Task).join(
+            TaskSchedule, Task.id == TaskSchedule.task_id
+        ).filter(
+            Task.assignee_id == user_id,
+            Task.status.in_([TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value]),
+            TaskSchedule.end_date >= today,
+            TaskSchedule.end_date <= three_days_later
+        ).count()
+        
+        if upcoming_deadline_tasks > 0:
+            todo_reminders.append(TodoReminder(
+                type="upcoming_deadline",
+                title="即将到期任务（3天内）",
+                count=upcoming_deadline_tasks,
+                link="/tasks?status=in_progress"
+            ))
 
         # 4. 最近任务（最近5个任务）
         recent_tasks = db.query(Task).filter(
@@ -249,10 +272,36 @@ class DashboardService:
             total_man_days = workload_data['total_man_days']
             total_workload += total_man_days
 
-            # 计算负荷状态（简化版：基于活跃任务数）
-            if active_tasks >= 5:
+            # 计算负荷状态（基于实际工作量）
+            # 获取未来30天内的预计工作量（基于已认领任务的拟投入人天）
+            from app.models.task_schedule import TaskSchedule
+            from datetime import timedelta
+            
+            today = date.today()
+            future_date = today + timedelta(days=30)
+            
+            # 计算未来30天内的预计工作量
+            future_workload = Decimal("0")
+            future_tasks = db.query(Task).join(
+                TaskSchedule, Task.id == TaskSchedule.task_id
+            ).filter(
+                Task.assignee_id == developer.id,
+                Task.status.in_([TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value]),
+                TaskSchedule.start_date <= future_date,
+                TaskSchedule.end_date >= today
+            ).all()
+            
+            for task in future_tasks:
+                if task.estimated_man_days:
+                    future_workload += task.estimated_man_days
+            
+            # 负荷阈值：每月20个工作日，30天约等于22个工作日
+            # overloaded: > 18人天（约80%负荷）
+            # normal: 8-18人天（约35%-80%负荷）
+            # idle: < 8人天（< 35%负荷）
+            if future_workload > Decimal("18"):
                 workload_status = "overloaded"
-            elif active_tasks >= 2:
+            elif future_workload >= Decimal("8"):
                 workload_status = "normal"
             else:
                 workload_status = "idle"
@@ -280,6 +329,29 @@ class DashboardService:
         task_completion_rate = Decimal("0")
         if total_tasks > 0:
             task_completion_rate = Decimal(str(completed_tasks)) / Decimal(str(total_tasks)) * Decimal("100")
+        
+        # 待办提醒
+        todo_reminders: List[TodoReminder] = []
+        
+        # 过载人员提醒
+        overloaded_members = [m for m in member_summaries if m.workload_status == "overloaded"]
+        if overloaded_members:
+            todo_reminders.append(TodoReminder(
+                type="overloaded_members",
+                title="过载人员预警",
+                count=len(overloaded_members),
+                link="/dashboard/team"
+            ))
+        
+        # 空闲人员提醒（可选，帮助分配任务）
+        idle_members = [m for m in member_summaries if m.workload_status == "idle"]
+        if idle_members:
+            todo_reminders.append(TodoReminder(
+                type="idle_members",
+                title="空闲人员（可分配任务）",
+                count=len(idle_members),
+                link="/dashboard/team"
+            )) Decimal(str(completed_tasks)) / Decimal(str(total_tasks)) * Decimal("100")
 
         # 2. 待办提醒
         todo_reminders: List[TodoReminder] = []

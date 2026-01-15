@@ -279,7 +279,7 @@ const getReminderType = (type: string) => {
     pending_confirmation: 'warning',
     over_budget: 'danger',
   }
-  return typeMap[type] || 'info'
+  return typeMap[type] || 'warning'
 }
 
 const handleTodoClick = (reminder: { link?: string }) => {

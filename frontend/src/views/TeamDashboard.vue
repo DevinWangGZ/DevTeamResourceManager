@@ -92,7 +92,8 @@
         </el-table-column>
         <el-table-column prop="workload_status" label="负荷状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="getWorkloadStatusType(row.workload_status)">
+            <el-tag :type="getWorkloadStatusType(row.workload_status)" :effect="row.workload_status === 'overloaded' ? 'dark' : 'plain'">
+              <el-icon v-if="row.workload_status === 'overloaded'" style="margin-right: 4px;"><WarningFilled /></el-icon>
               {{ getWorkloadStatusText(row.workload_status) }}
             </el-tag>
           </template>
@@ -234,6 +235,7 @@ import {
   Operation,
   Refresh,
   TrendCharts,
+  WarningFilled,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadChart from '@/components/business/WorkloadChart.vue'
@@ -293,8 +295,9 @@ const getWorkloadStatusType = (status: string) => {
 const getReminderType = (type: string) => {
   const typeMap: Record<string, string> = {
     overloaded_members: 'danger',
+    idle_members: 'info',
   }
-  return typeMap[type] || 'info'
+  return typeMap[type] || 'warning'
 }
 
 const handleTodoClick = (reminder: { link?: string }) => {
