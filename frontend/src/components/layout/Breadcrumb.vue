@@ -40,6 +40,9 @@ const items = computed<BreadcrumbItem[]>(() => {
     case 'TeamDashboard':
       breadcrumbs.push({ title: '团队管理仪表盘' })
       break
+    case 'TeamCapabilityInsights':
+      breadcrumbs.push({ title: '团队能力洞察' })
+      break
     case 'TaskList':
       breadcrumbs.push({ title: '任务管理' })
       break

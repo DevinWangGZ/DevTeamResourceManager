@@ -5,7 +5,7 @@
     <div class="page-header">
       <h2>消息中心</h2>
       <div class="header-actions">
-        <el-button @click="markAllAsRead" :disabled="unreadCount === 0">
+        <el-button @click="markAllAsReadHandler" :disabled="unreadCount === 0">
           全部标记为已读
         </el-button>
         <el-button type="primary" @click="refreshData" :loading="loading">
@@ -105,7 +105,7 @@
                   link
                   type="primary"
                   size="small"
-                  @click.stop="markAsRead(message.id)"
+                  @click.stop="markAsReadHandler(message.id)"
                 >
                   标记已读
                 </el-button>
@@ -154,7 +154,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
-import { getMessages, getUnreadCount, markAsRead, markAllAsRead, deleteMessage, type Message } from '@/api/message'
+import { getMessages, getUnreadCount, markAsRead as markAsReadAPI, markAllAsRead as markAllAsReadAPI, deleteMessage, type Message } from '@/api/message'
 
 const router = useRouter()
 
@@ -257,9 +257,13 @@ const handlePageSizeChange = (size: number) => {
 const handleMessageClick = async (message: Message) => {
   // 如果未读，自动标记为已读
   if (!message.is_read) {
-    await markAsRead(message.id)
-    message.is_read = true
-    unreadCount.value = Math.max(0, unreadCount.value - 1)
+    try {
+      await markAsReadAPI(message.id)
+      message.is_read = true
+      unreadCount.value = Math.max(0, unreadCount.value - 1)
+    } catch (error: any) {
+      console.error('标记消息已读失败:', error)
+    }
   }
 
   // 如果有关联任务，跳转到任务详情
@@ -270,7 +274,7 @@ const handleMessageClick = async (message: Message) => {
 
 const markAsReadHandler = async (messageId: number) => {
   try {
-    await markAsRead(messageId)
+    await markAsReadAPI(messageId)
     const message = messages.value.find(m => m.id === messageId)
     if (message) {
       message.is_read = true
@@ -282,14 +286,14 @@ const markAsReadHandler = async (messageId: number) => {
   }
 }
 
-const markAllAsRead = async () => {
+const markAllAsReadHandler = async () => {
   try {
     await ElMessageBox.confirm('确定要标记所有消息为已读吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning',
     })
-    await markAllAsRead(filterForm.type)
+    await markAllAsReadAPI(filterForm.type)
     ElMessage.success('已标记所有消息为已读')
     refreshData()
   } catch (error: any) {

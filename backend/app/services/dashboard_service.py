@@ -100,7 +100,6 @@ class DashboardService:
         
         # 即将到期任务提醒（3天内到期）
         from app.models.task_schedule import TaskSchedule
-        from datetime import timedelta
         today = date.today()
         three_days_later = today + timedelta(days=3)
         
@@ -275,7 +274,6 @@ class DashboardService:
             # 计算负荷状态（基于实际工作量）
             # 获取未来30天内的预计工作量（基于已认领任务的拟投入人天）
             from app.models.task_schedule import TaskSchedule
-            from datetime import timedelta
             
             today = date.today()
             future_date = today + timedelta(days=30)
@@ -351,19 +349,6 @@ class DashboardService:
                 title="空闲人员（可分配任务）",
                 count=len(idle_members),
                 link="/dashboard/team"
-            )) Decimal(str(completed_tasks)) / Decimal(str(total_tasks)) * Decimal("100")
-
-        # 2. 待办提醒
-        todo_reminders: List[TodoReminder] = []
-        
-        # 过载人员提醒
-        overloaded_members = [m for m in member_summaries if m.workload_status == "overloaded"]
-        if overloaded_members:
-            todo_reminders.append(TodoReminder(
-                type="overloaded_members",
-                title="过载人员提醒",
-                count=len(overloaded_members),
-                link="/team/workload"
             ))
 
         return TeamDashboardResponse(

@@ -266,6 +266,7 @@ import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadTimeline from '@/components/business/WorkloadTimeline.vue'
 import WorkloadChart from '@/components/business/WorkloadChart.vue'
 import { getDeveloperDashboard, type DeveloperDashboard } from '@/api/dashboard'
+import { getWorkloadTrend } from '@/api/workload'
 
 const router = useRouter()
 const loading = ref(false)
@@ -283,12 +284,20 @@ const taskStatusChartData = computed(() => {
   ].filter(item => item.value > 0)
 })
 
-// 工作量趋势数据（模拟数据，实际应从API获取）
-const workloadTrendData = computed(() => {
-  // TODO: 从API获取工作量趋势数据
-  // 目前返回空数组，后续需要添加API接口
-  return []
-})
+// 工作量趋势数据
+const workloadTrendData = ref<Array<{ name: string; value: number }>>([])
+
+const loadWorkloadTrend = async () => {
+  try {
+    const result = await getWorkloadTrend({ period_type: 'month', months: 6 })
+    workloadTrendData.value = result.items.map(item => ({
+      name: item.period,
+      value: item.total_man_days,
+    }))
+  } catch (error: any) {
+    console.error('加载工作量趋势数据失败:', error)
+  }
+}
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return ''
@@ -372,6 +381,8 @@ const loadDashboard = async () => {
   try {
     const data = await getDeveloperDashboard()
     dashboardData.value = data
+    // 同时加载工作量趋势数据
+    await loadWorkloadTrend()
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '加载工作台数据失败')
   } finally {

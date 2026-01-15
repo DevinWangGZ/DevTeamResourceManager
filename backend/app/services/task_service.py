@@ -331,6 +331,22 @@ class TaskService:
             task.assignee_id = None
             db.commit()
             db.refresh(task)
+            
+            # 创建消息通知（通知项目经理任务被拒绝）
+            try:
+                from app.services.message_service import MessageService
+                if task.creator_id:
+                    MessageService.create_message(
+                        db=db,
+                        user_id=task.creator_id,
+                        title="任务评估被拒绝",
+                        content=f"任务《{task.title}》被开发人员拒绝，已重新发布。",
+                        message_type="task_status_change",
+                        related_task_id=task.id
+                    )
+            except Exception:
+                # 消息创建失败不影响任务拒绝
+                pass
 
         return task
 

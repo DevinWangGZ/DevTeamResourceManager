@@ -170,6 +170,9 @@
       </el-col>
     </el-row>
 
+    <!-- 团队负荷看板 -->
+    <TeamWorkloadBoard style="margin-top: 20px" />
+
     <!-- 待办提醒 -->
     <el-card class="todo-card" style="margin-top: 20px" v-loading="loading">
       <template #header>
@@ -218,6 +221,10 @@
           <el-icon><TrendCharts /></el-icon>
           绩效数据
         </el-button>
+        <el-button type="warning" size="large" @click="goToCapabilityInsights">
+          <el-icon><DataAnalysis /></el-icon>
+          能力洞察
+        </el-button>
       </div>
     </el-card>
   </div>
@@ -239,6 +246,7 @@ import {
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadChart from '@/components/business/WorkloadChart.vue'
+import TeamWorkloadBoard from '@/components/business/TeamWorkloadBoard.vue'
 import { getTeamDashboard, type TeamDashboard } from '@/api/dashboard'
 
 const router = useRouter()

@@ -70,8 +70,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { Calendar } from '@element-plus/icons-vue'
-import { getMyWorkloadStatistics } from '@/api/workload'
-import type { WorkloadStatistic } from '@/api/workload'
+import { ElMessage } from 'element-plus'
+import { getWorkloadTimeline, type WorkloadTimelineItem } from '@/api/workload'
 
 interface Props {
   title?: string
@@ -90,7 +90,7 @@ const props = withDefaults(defineProps<Props>(), {
 const loading = ref(false)
 const viewType = ref<'week' | 'month'>('week')
 const timelineRef = ref<HTMLDivElement>()
-const workloadData = ref<WorkloadStatistic[]>([])
+const workloadData = ref<WorkloadTimelineItem[]>([])
 
 // 计算时间轴数据
 const timelineData = computed(() => {
@@ -113,6 +113,10 @@ const timelineData = computed(() => {
       date.setDate(date.getDate() - i * 7)
       const weekStart = new Date(date)
       weekStart.setDate(date.getDate() - date.getDay()) // 周一开始
+      
+      // 获取ISO周号
+      const weekNum = getISOWeek(weekStart)
+      const weekKey = `${weekStart.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`
 
       // 查找该周的工作量数据
       const weekData = workloadData.value.find((item) => {
@@ -123,7 +127,8 @@ const timelineData = computed(() => {
 
       data.push({
         date: weekStart.toISOString().split('T')[0],
-        workload: weekData ? parseFloat(weekData.total_man_days.toString()) : 0,
+        workload: weekData ? weekData.total_man_days : 0,
+        tasks: weekData?.tasks || [],
       })
     }
   } else {
@@ -143,19 +148,35 @@ const timelineData = computed(() => {
       })
 
       const totalWorkload = monthData.reduce(
-        (sum, item) => sum + parseFloat(item.total_man_days.toString()),
+        (sum, item) => sum + item.total_man_days,
         0
+      )
+      
+      // 合并所有任务（去重）
+      const allTasks = monthData.flatMap(item => item.tasks || [])
+      const uniqueTasks = Array.from(
+        new Map(allTasks.map(task => [task.id, task])).values()
       )
 
       data.push({
         date: monthStart.toISOString().split('T')[0],
         workload: totalWorkload,
+        tasks: uniqueTasks,
       })
     }
   }
 
   return data
 })
+
+// 获取ISO周号
+function getISOWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+}
 
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
@@ -197,30 +218,34 @@ const loadWorkloadData = async () => {
   loading.value = true
   try {
     const today = new Date()
-    let periodStart: string
-    let periodEnd: string
+    let startDate: string
+    let endDate: string
 
     if (viewType.value === 'week') {
-      // 最近4周
+      // 最近4周 + 未来1周
       const start = new Date(today)
       start.setDate(start.getDate() - 28)
-      periodStart = start.toISOString().split('T')[0]
-      periodEnd = today.toISOString().split('T')[0]
+      startDate = start.toISOString().split('T')[0]
+      const end = new Date(today)
+      end.setDate(end.getDate() + 7)
+      endDate = end.toISOString().split('T')[0]
     } else {
-      // 最近6个月
+      // 最近6个月 + 未来1个月
       const start = new Date(today.getFullYear(), today.getMonth() - 6, 1)
-      periodStart = start.toISOString().split('T')[0]
-      periodEnd = today.toISOString().split('T')[0]
+      startDate = start.toISOString().split('T')[0]
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+      endDate = end.toISOString().split('T')[0]
     }
 
-    const result = await getMyWorkloadStatistics({
-      period_start: props.startDate || periodStart,
-      period_end: props.endDate || periodEnd,
+    const result = await getWorkloadTimeline({
+      start_date: props.startDate || startDate,
+      end_date: props.endDate || endDate,
     })
 
     workloadData.value = result.items
   } catch (error: any) {
     console.error('加载负荷数据失败:', error)
+    ElMessage.error('加载工作负荷数据失败')
   } finally {
     loading.value = false
   }

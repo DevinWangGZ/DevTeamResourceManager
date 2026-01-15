@@ -78,3 +78,53 @@ export function getProjectWorkloadStatistics(
 ): Promise<WorkloadStatisticListResponse> {
   return request.get(`/api/v1/workload-statistics/project/${projectId}`, { params })
 }
+
+/**
+ * 工作负荷时间轴数据（基于任务排期）
+ */
+export interface WorkloadTimelineItem {
+  period_start: string
+  period_end: string
+  total_man_days: number
+  tasks: Array<{
+    id: number
+    title: string
+    status: string
+    estimated_man_days: number
+  }>
+}
+
+export interface WorkloadTimelineResponse {
+  total: number
+  items: WorkloadTimelineItem[]
+}
+
+export function getWorkloadTimeline(params?: {
+  start_date?: string
+  end_date?: string
+}): Promise<WorkloadTimelineResponse> {
+  return request.get('/api/v1/workload-statistics/workload', { params })
+}
+
+/**
+ * 工作量趋势数据
+ */
+export interface WorkloadTrendItem {
+  period: string
+  period_start: string
+  period_end: string
+  total_man_days: number
+}
+
+export interface WorkloadTrendResponse {
+  period_type: 'month' | 'week'
+  total: number
+  items: WorkloadTrendItem[]
+}
+
+export function getWorkloadTrend(params?: {
+  period_type?: 'month' | 'week'
+  months?: number
+}): Promise<WorkloadTrendResponse> {
+  return request.get('/api/v1/workload-statistics/trend', { params })
+}
