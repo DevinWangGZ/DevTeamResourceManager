@@ -93,6 +93,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/TaskMarketplace.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/messages',
+    name: 'MessageCenter',
+    component: () => import('@/views/MessageCenter.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

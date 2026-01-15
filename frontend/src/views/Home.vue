@@ -5,6 +5,7 @@
         <div class="header-content">
           <h1>DevTeam Manager</h1>
           <div class="user-info" v-if="userStore.userInfo">
+            <MessageNotification />
             <el-dropdown @command="handleCommand">
               <span class="user-dropdown">
                 <el-icon><User /></el-icon>
@@ -79,6 +80,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { User, ArrowDown, List, DataAnalysis, Monitor, FolderOpened, ShoppingBag } from '@element-plus/icons-vue'
+import MessageNotification from '@/components/business/MessageNotification.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -160,6 +162,7 @@ const goToMarketplace = () => {
 .user-info {
   display: flex;
   align-items: center;
+  gap: 15px;
 }
 
 .user-dropdown {

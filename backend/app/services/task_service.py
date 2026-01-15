@@ -173,9 +173,19 @@ class TaskService:
         if task.status != TaskStatus.DRAFT.value:
             raise ValidationError("只有草稿状态的任务可以发布")
 
+        old_status = task.status
         task.status = TaskStatus.PUBLISHED.value
         db.commit()
         db.refresh(task)
+        
+        # 创建消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            # 消息创建失败不影响任务发布
+            pass
+        
         return task
 
     @staticmethod
@@ -197,6 +207,7 @@ class TaskService:
         if task.assignee_id is not None:
             raise ValidationError("任务已被认领")
 
+        old_status = task.status
         task.status = TaskStatus.CLAIMED.value
         task.assignee_id = current_user_id
         db.commit()
@@ -212,6 +223,14 @@ class TaskService:
             )
         except Exception as e:
             # 排期生成失败不影响任务认领
+            pass
+
+        # 创建消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            # 消息创建失败不影响任务认领
             pass
 
         return task
@@ -244,10 +263,20 @@ class TaskService:
         if assignee.role != "developer":
             raise ValidationError("只能派发给开发人员")
 
+        old_status = task.status
         task.status = TaskStatus.PENDING_EVAL.value
         task.assignee_id = assignee_id
         db.commit()
         db.refresh(task)
+        
+        # 创建消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            # 消息创建失败不影响任务派发
+            pass
+        
         return task
 
     @staticmethod
@@ -270,6 +299,7 @@ class TaskService:
         if task.assignee_id != current_user_id:
             raise PermissionDeniedError("只有被派发的开发人员可以评估任务")
 
+        old_status = task.status
         if accept:
             # 接受：状态变为已认领
             task.status = TaskStatus.CLAIMED.value
@@ -286,6 +316,14 @@ class TaskService:
                 )
             except Exception as e:
                 # 排期生成失败不影响任务接受
+                pass
+            
+            # 创建消息通知
+            try:
+                from app.services.message_service import MessageService
+                MessageService.create_task_status_change_message(db, task, old_status, task.status)
+            except Exception:
+                # 消息创建失败不影响任务接受
                 pass
         else:
             # 拒绝：状态变为已发布，清除认领者
@@ -315,9 +353,19 @@ class TaskService:
         if task.status != TaskStatus.CLAIMED.value:
             raise ValidationError("只有已认领状态的任务可以开始")
 
+        old_status = task.status
         task.status = TaskStatus.IN_PROGRESS.value
         db.commit()
         db.refresh(task)
+        
+        # 创建消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            # 消息创建失败不影响任务开始
+            pass
+        
         return task
 
     @staticmethod
@@ -340,10 +388,20 @@ class TaskService:
         if task.status not in [TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value]:
             raise ValidationError("只有已认领或进行中状态的任务可以提交")
 
+        old_status = task.status
         task.status = TaskStatus.SUBMITTED.value
         task.actual_man_days = actual_man_days
         db.commit()
         db.refresh(task)
+        
+        # 创建消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            # 消息创建失败不影响任务提交
+            pass
+        
         return task
 
     @staticmethod
@@ -367,9 +425,18 @@ class TaskService:
             raise ValidationError("只有已提交状态的任务可以确认")
 
         # 更新任务状态
+        old_status = task.status
         task.status = TaskStatus.CONFIRMED.value
         db.commit()
         db.refresh(task)
+
+        # 创建消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            # 消息创建失败不影响任务确认
+            pass
 
         # 任务确认后，自动更新工作量统计
         try:
