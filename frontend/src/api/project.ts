@@ -115,3 +115,44 @@ export function getProjectTasks(
 ): Promise<ProjectTaskExecutionResponse> {
   return request.get(`/api/v1/projects/${projectId}/tasks`, { params })
 }
+
+export interface ProjectProgressResponse {
+  project_id: number
+  project_name: string
+  project_start_date?: string
+  project_end_date?: string
+  project_duration_days: number
+  task_statistics: {
+    total: number
+    draft: number
+    published: number
+    claimed: number
+    in_progress: number
+    submitted: number
+    confirmed: number
+    archived: number
+    completion_rate: number
+  }
+  workload_statistics: {
+    total_estimated_man_days: number
+    total_actual_man_days: number
+  }
+  output_statistics: {
+    estimated_value: number
+    task_output_value: number
+    allocated_output_value: number
+    completion_rate: number
+    is_over_budget: boolean
+  }
+  monthly_statistics: Array<{
+    month: string
+    confirmed_tasks: number
+  }>
+}
+
+/**
+ * 获取项目进展数据
+ */
+export function getProjectProgress(projectId: number): Promise<ProjectProgressResponse> {
+  return request.get(`/api/v1/projects/${projectId}/progress`)
+}

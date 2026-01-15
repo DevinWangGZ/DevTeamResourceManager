@@ -80,6 +80,15 @@
               任务执行
             </el-button>
             <el-button
+              v-if="canViewTasks(row)"
+              link
+              type="info"
+              size="small"
+              @click="viewProjectProgress(row.id)"
+            >
+              进展数据
+            </el-button>
+            <el-button
               v-if="canEdit(row)"
               link
               type="warning"
@@ -451,6 +460,10 @@ const viewProject = (projectId: number) => {
 
 const viewProjectTasks = (projectId: number) => {
   router.push({ name: 'ProjectTaskExecution', params: { id: projectId } })
+}
+
+const viewProjectProgress = (projectId: number) => {
+  router.push({ name: 'ProjectProgress', params: { id: projectId } })
 }
 
 const canViewTasks = (project: Project) => {

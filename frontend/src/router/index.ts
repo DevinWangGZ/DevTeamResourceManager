@@ -81,6 +81,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ProjectTaskExecution.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/projects/:id/progress',
+    name: 'ProjectProgress',
+    component: () => import('@/views/ProjectProgress.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
