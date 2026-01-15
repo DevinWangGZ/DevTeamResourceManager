@@ -43,6 +43,9 @@ const items = computed<BreadcrumbItem[]>(() => {
     case 'TaskList':
       breadcrumbs.push({ title: '任务管理' })
       break
+    case 'TaskMarketplace':
+      breadcrumbs.push({ title: '任务集市' })
+      break
     case 'TaskDetail':
       breadcrumbs.push(
         { title: '任务管理', path: '/tasks' },

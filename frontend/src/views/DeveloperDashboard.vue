@@ -227,15 +227,19 @@
         </div>
       </template>
       <div class="quick-actions">
+        <el-button type="success" size="large" @click="goToMarketplace">
+          <el-icon><ShoppingBag /></el-icon>
+          任务集市
+        </el-button>
         <el-button type="primary" size="large" @click="goToTasks">
           <el-icon><List /></el-icon>
           任务管理
         </el-button>
-        <el-button type="success" size="large" @click="goToProfile">
+        <el-button type="info" size="large" @click="goToProfile">
           <el-icon><User /></el-icon>
           个人档案
         </el-button>
-        <el-button type="info" size="large" @click="goToWorkload">
+        <el-button type="warning" size="large" @click="goToWorkload">
           <el-icon><DataAnalysis /></el-icon>
           工作量统计
         </el-button>
@@ -256,6 +260,7 @@ import {
   ArrowRight,
   Operation,
   User,
+  ShoppingBag,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadTimeline from '@/components/business/WorkloadTimeline.vue'
@@ -358,6 +363,10 @@ const goToProfile = () => {
 
 const goToWorkload = () => {
   router.push('/workload')
+}
+
+const goToMarketplace = () => {
+  router.push('/marketplace')
 }
 
 const loadDashboard = async () => {

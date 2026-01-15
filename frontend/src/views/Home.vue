@@ -51,6 +51,10 @@
               <el-icon><List /></el-icon>
               任务管理
             </el-button>
+            <el-button type="success" size="large" @click="goToMarketplace" v-if="userStore.userInfo?.role === 'developer'">
+              <el-icon><ShoppingBag /></el-icon>
+              任务集市
+            </el-button>
             <el-button type="success" size="large" @click="goToProfile">
               <el-icon><User /></el-icon>
               个人档案
@@ -74,7 +78,7 @@
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { User, ArrowDown, List, DataAnalysis, Monitor, FolderOpened } from '@element-plus/icons-vue'
+import { User, ArrowDown, List, DataAnalysis, Monitor, FolderOpened, ShoppingBag } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -122,6 +126,10 @@ const goToTeamDashboard = () => {
 
 const goToProjects = () => {
   router.push('/projects')
+}
+
+const goToMarketplace = () => {
+  router.push('/marketplace')
 }
 </script>
 

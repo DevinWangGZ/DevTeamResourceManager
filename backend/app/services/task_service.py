@@ -49,7 +49,12 @@ class TaskService:
         current_user_role: Optional[str] = None
     ) -> Tuple[List[Task], int]:
         """获取任务列表（支持筛选）"""
-        query = db.query(Task)
+        from sqlalchemy.orm import joinedload
+        
+        query = db.query(Task).options(
+            joinedload(Task.creator),
+            joinedload(Task.project)
+        )
 
         # 权限过滤：开发人员只能看到自己相关的任务或已发布的任务
         if current_user_role == "developer":
@@ -86,6 +91,18 @@ class TaskService:
                     Task.description.like(keyword)
                 )
             )
+
+        # 技能筛选（所需技能包含指定技能）
+        if filters.required_skills:
+            skills_list = [s.strip() for s in filters.required_skills.split(',') if s.strip()]
+            if skills_list:
+                # 使用LIKE查询，匹配任务所需技能字段中包含的技能
+                skill_filters = []
+                for skill in skills_list:
+                    skill_pattern = f"%{skill}%"
+                    skill_filters.append(Task.required_skills.like(skill_pattern))
+                if skill_filters:
+                    query = query.filter(or_(*skill_filters))
 
         # 总数
         total = query.count()

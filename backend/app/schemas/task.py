@@ -107,5 +107,6 @@ class TaskFilterParams(BaseModel):
     creator_id: Optional[int] = None
     assignee_id: Optional[int] = None
     keyword: Optional[str] = None
+    required_skills: Optional[str] = None  # 所需技能（逗号分隔）
     page: int = Field(1, ge=1)
     page_size: int = Field(10, ge=1, le=100)

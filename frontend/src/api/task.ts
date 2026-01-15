@@ -111,6 +111,43 @@ export function deleteTask(taskId: number): Promise<void> {
   return request.delete(`/api/v1/tasks/${taskId}`)
 }
 
+export interface MarketplaceTask {
+  id: number
+  title: string
+  description?: string
+  status: string
+  project_id?: number
+  project_name?: string
+  creator_id: number
+  creator_name?: string
+  estimated_man_days: number
+  required_skills?: string
+  deadline?: string
+  created_at?: string
+}
+
+export interface MarketplaceResponse {
+  tasks: MarketplaceTask[]
+  total: number
+  page: number
+  page_size: number
+}
+
+/**
+ * 获取任务集市数据
+ */
+export function getMarketplaceTasks(params?: {
+  status?: string
+  project_id?: number
+  keyword?: string
+  required_skills?: string
+  recommend?: boolean
+  page?: number
+  page_size?: number
+}): Promise<MarketplaceResponse> {
+  return request.get('/api/v1/tasks/marketplace', { params })
+}
+
 /**
  * 发布任务
  */

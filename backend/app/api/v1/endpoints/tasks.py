@@ -47,6 +47,7 @@ async def get_tasks(
     creator_id: Optional[int] = Query(None, description="创建者ID"),
     assignee_id: Optional[int] = Query(None, description="认领者ID"),
     keyword: Optional[str] = Query(None, description="关键词搜索"),
+    required_skills: Optional[str] = Query(None, description="所需技能（逗号分隔）"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
     db: Session = Depends(get_db),
@@ -59,6 +60,7 @@ async def get_tasks(
         creator_id=creator_id,
         assignee_id=assignee_id,
         keyword=keyword,
+        required_skills=required_skills,
         page=page,
         page_size=page_size
     )
@@ -69,6 +71,88 @@ async def get_tasks(
         current_user_role=current_user.role
     )
     return TaskListResponse(total=total, items=tasks)
+
+
+@router.get("/marketplace", response_model=dict)
+async def get_marketplace_tasks(
+    status: Optional[TaskStatus] = Query(None, description="任务状态"),
+    project_id: Optional[int] = Query(None, description="项目ID"),
+    keyword: Optional[str] = Query(None, description="关键词搜索"),
+    required_skills: Optional[str] = Query(None, description="所需技能（逗号分隔）"),
+    recommend: bool = Query(False, description="是否推荐（基于当前用户技能）"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取任务集市数据（仅显示已发布的任务）"""
+    from app.models.task import TaskStatus
+    from app.models.skill import Skill
+    
+    # 只显示已发布的任务
+    filters = TaskFilterParams(
+        status=TaskStatus.PUBLISHED,
+        project_id=project_id,
+        keyword=keyword,
+        required_skills=required_skills,
+        page=page,
+        page_size=page_size
+    )
+    
+    tasks, total = TaskService.get_tasks(
+        db,
+        filters,
+        current_user_id=current_user.id,
+        current_user_role=current_user.role
+    )
+    
+    # 如果启用推荐，基于用户技能进行排序
+    if recommend and current_user.role == "developer":
+        # 获取用户技能
+        user_skills = db.query(Skill).filter(Skill.user_id == current_user.id).all()
+        user_skill_names = {skill.name.lower() for skill in user_skills}
+        
+        # 计算每个任务的匹配度
+        task_scores = []
+        for task in tasks:
+            score = 0
+            if task.required_skills:
+                task_skills = [s.strip().lower() for s in task.required_skills.split(',')]
+                matched_skills = [s for s in task_skills if s in user_skill_names]
+                if matched_skills:
+                    score = len(matched_skills) / len(task_skills) if task_skills else 0
+            
+            task_scores.append((task, score))
+        
+        # 按匹配度排序（匹配度高的在前）
+        task_scores.sort(key=lambda x: x[1], reverse=True)
+        tasks = [task for task, _ in task_scores]
+    
+    # 构建响应数据
+    tasks_data = []
+    for task in tasks:
+        task_data = {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "status": task.status,
+            "project_id": task.project_id,
+            "project_name": task.project.name if task.project else None,
+            "creator_id": task.creator_id,
+            "creator_name": task.creator.full_name or task.creator.username if task.creator else None,
+            "estimated_man_days": float(task.estimated_man_days) if task.estimated_man_days else 0,
+            "required_skills": task.required_skills,
+            "deadline": task.deadline.isoformat() if task.deadline else None,
+            "created_at": task.created_at.isoformat() if task.created_at else None,
+        }
+        tasks_data.append(task_data)
+    
+    return {
+        "tasks": tasks_data,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @router.get("/{task_id}", response_model=TaskDetailResponse)

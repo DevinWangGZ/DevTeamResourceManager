@@ -87,6 +87,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ProjectProgress.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/marketplace',
+    name: 'TaskMarketplace',
+    component: () => import('@/views/TaskMarketplace.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
