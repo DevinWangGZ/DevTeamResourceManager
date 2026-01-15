@@ -234,7 +234,6 @@ import {
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadChart from '@/components/business/WorkloadChart.vue'
 import { getProjectManagerDashboard, type ProjectManagerDashboard, type ProjectOutputSummary } from '@/api/dashboard'
-import { computed } from 'vue'
 
 const router = useRouter()
 const loading = ref(false)

@@ -266,7 +266,6 @@ import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadTimeline from '@/components/business/WorkloadTimeline.vue'
 import WorkloadChart from '@/components/business/WorkloadChart.vue'
 import { getDeveloperDashboard, type DeveloperDashboard } from '@/api/dashboard'
-import { computed } from 'vue'
 
 const router = useRouter()
 const loading = ref(false)

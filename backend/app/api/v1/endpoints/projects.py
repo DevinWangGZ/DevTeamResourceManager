@@ -195,12 +195,16 @@ async def get_project_tasks(
         }
         
         # 获取排期信息
+        from app.services.schedule_service import ScheduleService
         schedule = db.query(TaskSchedule).filter(TaskSchedule.task_id == task.id).first()
         if schedule:
+            work_days = 0
+            if schedule.start_date and schedule.end_date:
+                work_days = ScheduleService.get_workdays_count(schedule.start_date, schedule.end_date, db)
             task_data["schedule"] = {
                 "start_date": schedule.start_date.isoformat() if schedule.start_date else None,
                 "end_date": schedule.end_date.isoformat() if schedule.end_date else None,
-                "work_days": schedule.work_days,
+                "work_days": work_days,
                 "is_pinned": schedule.is_pinned,
             }
         
@@ -330,11 +334,21 @@ async def get_project_progress(
     today = date.today()
     monthly_stats = []
     for i in range(5, -1, -1):  # 最近6个月
-        month_start = date(today.year, today.month - i, 1)
-        if month_start.month == 12:
-            month_end = date(month_start.year + 1, 1, 1) - timedelta(days=1)
+        # 计算月份，处理跨年情况
+        target_month = today.month - i
+        target_year = today.year
+        
+        # 如果月份小于1，需要向前推一年
+        while target_month < 1:
+            target_month += 12
+            target_year -= 1
+        
+        month_start = date(target_year, target_month, 1)
+        # 计算月份最后一天
+        if target_month == 12:
+            month_end = date(target_year + 1, 1, 1) - timedelta(days=1)
         else:
-            month_end = date(month_start.year, month_start.month + 1, 1) - timedelta(days=1)
+            month_end = date(target_year, target_month + 1, 1) - timedelta(days=1)
         
         month_confirmed = db.query(Task).filter(
             Task.project_id == project_id,
