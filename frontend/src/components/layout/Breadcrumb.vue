@@ -52,6 +52,27 @@ const items = computed<BreadcrumbItem[]>(() => {
     case 'MessageCenter':
       breadcrumbs.push({ title: '消息中心' })
       break
+    case 'ArticleList':
+      breadcrumbs.push({ title: '知识分享' })
+      break
+    case 'ArticleCreate':
+      breadcrumbs.push(
+        { title: '知识分享', path: '/articles' },
+        { title: '创建文章' }
+      )
+      break
+    case 'ArticleDetail':
+      breadcrumbs.push(
+        { title: '知识分享', path: '/articles' },
+        { title: '文章详情' }
+      )
+      break
+    case 'ArticleEdit':
+      breadcrumbs.push(
+        { title: '知识分享', path: '/articles' },
+        { title: '编辑文章' }
+      )
+      break
     case 'TaskDetail':
       breadcrumbs.push(
         { title: '任务管理', path: '/tasks' },

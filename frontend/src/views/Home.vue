@@ -68,6 +68,10 @@
               <el-icon><FolderOpened /></el-icon>
               项目管理
             </el-button>
+            <el-button type="primary" size="large" @click="goToArticles">
+              <el-icon><Document /></el-icon>
+              知识分享
+            </el-button>
           </div>
         </div>
       </el-main>
@@ -79,7 +83,7 @@
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { User, ArrowDown, List, DataAnalysis, Monitor, FolderOpened, ShoppingBag } from '@element-plus/icons-vue'
+import { User, ArrowDown, List, DataAnalysis, Monitor, FolderOpened, ShoppingBag, Document } from '@element-plus/icons-vue'
 import MessageNotification from '@/components/business/MessageNotification.vue'
 
 const router = useRouter()
@@ -132,6 +136,10 @@ const goToProjects = () => {
 
 const goToMarketplace = () => {
   router.push('/marketplace')
+}
+
+const goToArticles = () => {
+  router.push({ name: 'ArticleList' })
 }
 </script>
 

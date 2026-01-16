@@ -105,6 +105,30 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/MessageCenter.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/articles',
+    name: 'ArticleList',
+    component: () => import('@/views/ArticleList.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/articles/create',
+    name: 'ArticleCreate',
+    component: () => import('@/views/ArticleCreate.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/articles/:id',
+    name: 'ArticleDetail',
+    component: () => import('@/views/ArticleDetail.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/articles/:id/edit',
+    name: 'ArticleEdit',
+    component: () => import('@/views/ArticleCreate.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
