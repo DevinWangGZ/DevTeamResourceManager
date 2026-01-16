@@ -27,6 +27,10 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   (response: AxiosResponse) => {
+    // 如果是blob响应，返回整个response对象
+    if (response.config.responseType === 'blob') {
+      return response.data
+    }
     return response.data
   },
   (error) => {

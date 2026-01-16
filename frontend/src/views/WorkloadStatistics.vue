@@ -5,6 +5,10 @@
       <template #header>
         <div class="workload-header">
           <h2>工作量统计</h2>
+          <el-button type="primary" @click="handleExport">
+            <el-icon><Download /></el-icon>
+            导出Excel
+          </el-button>
         </div>
       </template>
 
@@ -316,6 +320,30 @@ const resetFilters = () => {
   filters.period_end = undefined
   currentPage.value = 1
   loadStatistics()
+}
+
+const handleExport = async () => {
+  try {
+    const blob = await exportWorkloadStatistics({
+      project_id: filters.project_id,
+      period_start: filters.period_start,
+      period_end: filters.period_end,
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `工作量统计_${new Date().toISOString().split('T')[0]}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('导出成功')
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '导出失败')
+  }
 }
 
 const handleSizeChange = (size: number) => {

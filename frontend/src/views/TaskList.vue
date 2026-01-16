@@ -3,10 +3,16 @@
     <Breadcrumb />
     <div class="task-header">
       <h2>任务管理</h2>
-      <el-button type="primary" @click="goToCreate">
-        <el-icon><Plus /></el-icon>
-        创建任务
-      </el-button>
+      <div class="header-actions">
+        <el-button @click="handleExport">
+          <el-icon><Download /></el-icon>
+          导出Excel
+        </el-button>
+        <el-button type="primary" @click="goToCreate">
+          <el-icon><Plus /></el-icon>
+          创建任务
+        </el-button>
+      </div>
     </div>
 
     <!-- 筛选栏 -->
@@ -253,7 +259,7 @@
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { Plus, Search, Download } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import {
   getTasks,
@@ -264,6 +270,7 @@ import {
   deleteTask,
   type Task,
 } from '@/api/task'
+import { exportTasks } from '@/api/export'
 import { getProjects, type Project } from '@/api/project'
 import { useRouter } from 'vue-router'
 
@@ -572,6 +579,40 @@ const goToCreate = () => {
   router.push({ name: 'TaskCreate' })
 }
 
+const handleExport = async () => {
+  try {
+    const params: any = {}
+    if (filterForm.status) {
+      params.status = filterForm.status
+    }
+    if (filterForm.project_id) {
+      params.project_id = filterForm.project_id
+    }
+    if (filterForm.creator_id) {
+      params.creator_id = filterForm.creator_id
+    }
+    if (filterForm.assignee_id) {
+      params.assignee_id = filterForm.assignee_id
+    }
+    
+    const blob = await exportTasks(params)
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `任务列表_${new Date().toISOString().split('T')[0]}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('导出成功')
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '导出失败')
+  }
+}
+
 const handleDelete = async (task: Task) => {
   try {
     await ElMessageBox.confirm(
@@ -608,6 +649,15 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.task-header h2 {
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .filter-card {
