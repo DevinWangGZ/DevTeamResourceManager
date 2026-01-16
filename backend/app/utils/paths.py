@@ -25,3 +25,10 @@ def get_uploads_images_dir() -> Path:
     images_dir = get_uploads_dir() / 'images'
     images_dir.mkdir(parents=True, exist_ok=True)
     return images_dir
+
+
+def get_uploads_attachments_dir() -> Path:
+    """获取uploads/attachments目录路径"""
+    attachments_dir = get_uploads_dir() / 'attachments'
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+    return attachments_dir

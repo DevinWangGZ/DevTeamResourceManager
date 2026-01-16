@@ -9,7 +9,7 @@ from typing import List
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.core.exceptions import ValidationError
-from app.utils.paths import get_uploads_images_dir
+from app.utils.paths import get_uploads_images_dir, get_uploads_attachments_dir
 
 router = APIRouter()
 
@@ -25,8 +25,38 @@ ALLOWED_IMAGE_TYPES = {
 # 最大文件大小（5MB）
 MAX_FILE_SIZE = 5 * 1024 * 1024
 
+# 附件最大文件大小（50MB）
+MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024
+
 # 上传目录
 UPLOAD_DIR = get_uploads_images_dir()
+ATTACHMENTS_DIR = get_uploads_attachments_dir()
+
+# 允许的附件类型
+ALLOWED_ATTACHMENT_TYPES = {
+    # Word文档
+    'application/msword',  # .doc
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # .docx
+    # PowerPoint
+    'application/vnd.ms-powerpoint',  # .ppt
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',  # .pptx
+    # PDF
+    'application/pdf',  # .pdf
+    # Excel
+    'application/vnd.ms-excel',  # .xls
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # .xlsx
+}
+
+# 文件扩展名到文件类型的映射
+FILE_EXT_TO_TYPE = {
+    '.doc': 'word',
+    '.docx': 'word',
+    '.ppt': 'ppt',
+    '.pptx': 'ppt',
+    '.pdf': 'pdf',
+    '.xls': 'excel',
+    '.xlsx': 'excel',
+}
 
 
 @router.post("/image")
@@ -123,4 +153,58 @@ async def upload_images(
     return {
         "results": results,
         "errors": errors,
+    }
+
+
+@router.post("/attachment")
+async def upload_attachment(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    上传附件（Word、PPT、PDF、Excel）
+    
+    权限：所有登录用户都可以上传
+    支持格式：.doc, .docx, .ppt, .pptx, .pdf, .xls, .xlsx
+    最大大小：50MB
+    """
+    # 验证文件类型
+    if file.content_type not in ALLOWED_ATTACHMENT_TYPES:
+        # 也检查文件扩展名
+        file_ext = Path(file.filename).suffix.lower()
+        if file_ext not in FILE_EXT_TO_TYPE:
+            raise ValidationError(
+                f"不支持的文件类型。支持的格式: Word (.doc, .docx), PowerPoint (.ppt, .pptx), PDF (.pdf), Excel (.xls, .xlsx)"
+            )
+    
+    # 验证文件大小
+    file_content = await file.read()
+    if len(file_content) > MAX_ATTACHMENT_SIZE:
+        raise ValidationError(f"文件大小不能超过 {MAX_ATTACHMENT_SIZE / 1024 / 1024}MB")
+    
+    # 获取文件扩展名和类型
+    file_ext = Path(file.filename).suffix.lower()
+    file_type = FILE_EXT_TO_TYPE.get(file_ext, 'unknown')
+    
+    # 生成唯一文件名
+    filename = f"{uuid.uuid4().hex}{file_ext}"
+    file_path = ATTACHMENTS_DIR / filename
+    
+    # 保存文件
+    try:
+        with open(file_path, 'wb') as f:
+            f.write(file_content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"文件保存失败: {str(e)}")
+    
+    # 返回文件URL（相对路径，前端会自动拼接baseURL）
+    file_url = f"/uploads/attachments/{filename}"
+    
+    return {
+        "url": file_url,
+        "filename": file.filename,  # 原始文件名
+        "saved_filename": filename,  # 保存的文件名
+        "size": len(file_content),
+        "type": file_type,
+        "mime_type": file.content_type or "application/octet-stream",
     }

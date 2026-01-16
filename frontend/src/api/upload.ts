@@ -22,3 +22,25 @@ export function uploadImage(file: File): Promise<ImageUploadResponse> {
     },
   })
 }
+
+/**
+ * 上传附件（Word、PPT、PDF、Excel）
+ */
+export interface AttachmentUploadResponse {
+  url: string
+  filename: string
+  saved_filename: string
+  size: number
+  type: string
+  mime_type: string
+}
+
+export function uploadAttachment(file: File): Promise<AttachmentUploadResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post('/api/v1/upload/attachment', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+}

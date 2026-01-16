@@ -11,9 +11,11 @@ from app.schemas.article import (
     ArticleResponse,
     ArticleListResponse,
     CategoryResponse,
-    TagResponse
+    TagResponse,
+    ArticleAttachmentResponse
 )
 from app.services.article_service import ArticleService
+from app.models.article_attachment import ArticleAttachment
 from app.core.exceptions import NotFoundError, PermissionDeniedError
 
 router = APIRouter()
@@ -71,9 +73,88 @@ async def get_articles(
         limit=page_size
     )
     
-    items = [ArticleResponse.model_validate(article) for article in articles]
+    items = []
+    for article in articles:
+        article_dict = ArticleResponse.model_validate(article).model_dump()
+        # 列表页不包含附件
+        article_dict.pop('attachments', None)
+        items.append(ArticleResponse(**article_dict))
     
     return ArticleListResponse(total=total, items=items)
+
+
+@router.post("/{article_id}/attachments", response_model=ArticleAttachmentResponse, status_code=status.HTTP_201_CREATED)
+async def add_attachment(
+    article_id: int,
+    file_path: str = Query(..., description="文件路径（从上传API获取）"),
+    filename: str = Query(..., description="原始文件名"),
+    file_size: int = Query(..., description="文件大小"),
+    file_type: str = Query(..., description="文件类型"),
+    mime_type: str = Query(..., description="MIME类型"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """添加文章附件"""
+    try:
+        article = ArticleService.get_article(db, article_id)
+        
+        # 权限检查：只有作者可以添加附件
+        if article.author_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有作者可以添加附件"
+            )
+        
+        # 创建附件记录
+        attachment = ArticleAttachment(
+            article_id=article_id,
+            filename=filename,
+            file_path=file_path,
+            file_size=file_size,
+            file_type=file_type,
+            mime_type=mime_type
+        )
+        db.add(attachment)
+        db.commit()
+        db.refresh(attachment)
+        
+        return ArticleAttachmentResponse.model_validate(attachment)
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.delete("/{article_id}/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_attachment(
+    article_id: int,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """删除文章附件"""
+    try:
+        article = ArticleService.get_article(db, article_id)
+        
+        # 权限检查：只有作者可以删除附件
+        if article.author_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有作者可以删除附件"
+            )
+        
+        attachment = db.query(ArticleAttachment).filter(
+            ArticleAttachment.id == attachment_id,
+            ArticleAttachment.article_id == article_id
+        ).first()
+        
+        if not attachment:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="附件不存在")
+        
+        db.delete(attachment)
+        db.commit()
+        
+        return None
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get("/{article_id}", response_model=ArticleResponse)
@@ -188,6 +269,11 @@ async def get_my_articles(
         limit=page_size
     )
     
-    items = [ArticleResponse.model_validate(article) for article in articles]
+    items = []
+    for article in articles:
+        article_dict = ArticleResponse.model_validate(article).model_dump()
+        # 列表页不包含附件
+        article_dict.pop('attachments', None)
+        items.append(ArticleResponse(**article_dict))
     
     return ArticleListResponse(total=total, items=items)

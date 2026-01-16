@@ -36,6 +36,7 @@ class ArticleResponse(ArticleBase):
     updated_at: datetime
     author_name: Optional[str] = None
     author_full_name: Optional[str] = None
+    attachments: Optional[List["ArticleAttachmentResponse"]] = None
 
     class Config:
         from_attributes = True
@@ -68,3 +69,18 @@ class TagResponse(BaseModel):
     """标签响应"""
     name: str
     count: int
+
+
+class ArticleAttachmentResponse(BaseModel):
+    """文章附件响应"""
+    id: int
+    article_id: int
+    filename: str
+    file_path: str
+    file_size: int
+    file_type: str
+    mime_type: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

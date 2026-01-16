@@ -5,6 +5,7 @@ from typing import List, Tuple, Optional
 from datetime import datetime
 
 from app.models.article import Article
+from app.models.article_attachment import ArticleAttachment
 from app.models.user import User
 from app.core.exceptions import NotFoundError, PermissionDeniedError, ValidationError
 from app.schemas.article import ArticleCreate, ArticleUpdate
@@ -38,7 +39,8 @@ class ArticleService:
     def get_article(db: Session, article_id: int) -> Article:
         """获取文章详情"""
         article = db.query(Article).options(
-            joinedload(Article.author)
+            joinedload(Article.author),
+            joinedload(Article.attachments)
         ).filter(Article.id == article_id).first()
         if not article:
             raise NotFoundError("文章", str(article_id))

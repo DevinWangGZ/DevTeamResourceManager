@@ -54,6 +54,44 @@
 
         <el-divider />
 
+        <!-- 附件列表 -->
+        <div v-if="article.attachments && article.attachments.length > 0" class="article-attachments">
+          <h3>附件</h3>
+          <div class="attachment-list">
+            <div
+              v-for="attachment in article.attachments"
+              :key="attachment.id"
+              class="attachment-item"
+            >
+              <el-icon><Document /></el-icon>
+              <span class="attachment-name">{{ attachment.filename }}</span>
+              <span class="attachment-size">{{ formatFileSize(attachment.file_size) }}</span>
+              <el-tag size="small" :type="getFileTypeTag(attachment.file_type)">
+                {{ getFileTypeName(attachment.file_type) }}
+              </el-tag>
+              <el-button
+                type="primary"
+                link
+                size="small"
+                @click="downloadAttachment(attachment)"
+              >
+                下载
+              </el-button>
+              <el-button
+                v-if="canEdit"
+                type="danger"
+                link
+                size="small"
+                @click="handleDeleteAttachment(attachment.id)"
+              >
+                删除
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <el-divider v-if="article.attachments && article.attachments.length > 0" />
+
         <!-- 文章内容 -->
         <div class="article-content">
           <MarkdownViewer :content="article.content" />
@@ -165,6 +203,58 @@ const formatDate = (dateStr: string) => {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+const formatFileSize = (size: number) => {
+  if (size < 1024) return size + ' B'
+  if (size < 1024 * 1024) return (size / 1024).toFixed(2) + ' KB'
+  return (size / (1024 * 1024)).toFixed(2) + ' MB'
+}
+
+const getFileTypeName = (type: string) => {
+  const typeMap: Record<string, string> = {
+    word: 'Word',
+    ppt: 'PowerPoint',
+    pdf: 'PDF',
+    excel: 'Excel',
+  }
+  return typeMap[type] || type
+}
+
+const getFileTypeTag = (type: string) => {
+  const typeMap: Record<string, string> = {
+    word: 'primary',
+    ppt: 'warning',
+    pdf: 'danger',
+    excel: 'success',
+  }
+  return typeMap[type] || 'info'
+}
+
+const downloadAttachment = (attachment: any) => {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  const url = `${apiBaseUrl}${attachment.file_path}`
+  window.open(url, '_blank')
+}
+
+const handleDeleteAttachment = async (attachmentId: number) => {
+  if (!article.value) return
+  
+  try {
+    await ElMessageBox.confirm('确定要删除这个附件吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    
+    await deleteArticleAttachment(article.value.id, attachmentId)
+    ElMessage.success('删除成功')
+    loadArticle()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '删除失败')
+    }
+  }
 }
 
 onMounted(() => {

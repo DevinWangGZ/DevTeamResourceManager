@@ -3,6 +3,17 @@
  */
 import request from './index'
 
+export interface ArticleAttachment {
+  id: number
+  article_id: number
+  filename: string
+  file_path: string
+  file_size: number
+  file_type: string
+  mime_type: string
+  created_at: string
+}
+
 export interface Article {
   id: number
   title: string
@@ -16,6 +27,7 @@ export interface Article {
   view_count: number
   created_at: string
   updated_at: string
+  attachments?: ArticleAttachment[]
 }
 
 export interface ArticleListResponse {
@@ -115,4 +127,27 @@ export function getMyArticles(params?: {
   page_size?: number
 }): Promise<ArticleListResponse> {
   return request.get('/api/v1/articles/my/articles', { params })
+}
+
+/**
+ * 添加文章附件
+ */
+export function addArticleAttachment(
+  articleId: number,
+  data: {
+    file_path: string
+    filename: string
+    file_size: number
+    file_type: string
+    mime_type: string
+  }
+): Promise<ArticleAttachment> {
+  return request.post(`/api/v1/articles/${articleId}/attachments`, null, { params: data })
+}
+
+/**
+ * 删除文章附件
+ */
+export function deleteArticleAttachment(articleId: number, attachmentId: number): Promise<void> {
+  return request.delete(`/api/v1/articles/${articleId}/attachments/${attachmentId}`)
 }

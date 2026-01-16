@@ -12,6 +12,7 @@ from app.models.holiday import Holiday
 from app.models.project_output_value import ProjectOutputValue
 from app.models.workload_statistic import WorkloadStatistic
 from app.models.article import Article
+from app.models.article_attachment import ArticleAttachment
 from app.models.message import Message, MessageType
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "ProjectOutputValue",
     "WorkloadStatistic",
     "Article",
+    "ArticleAttachment",
     "Message",
     "MessageType",
 ]

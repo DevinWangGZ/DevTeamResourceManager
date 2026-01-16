@@ -23,6 +23,7 @@ class Article(Base):
 
     # 关系
     author = relationship("User", back_populates="articles")
+    attachments = relationship("ArticleAttachment", back_populates="article", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Article(id={self.id}, title={self.title}, author_id={self.author_id}, is_published={self.is_published})>"

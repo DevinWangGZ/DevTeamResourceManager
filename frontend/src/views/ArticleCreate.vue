@@ -69,6 +69,50 @@
           </el-checkbox>
           <div class="form-tip">提示：草稿只有作者本人可以查看，发布后所有用户都可以查看</div>
         </el-form-item>
+
+        <!-- 附件上传 -->
+        <el-form-item label="附件">
+          <el-upload
+            ref="uploadRef"
+            :action="''"
+            :auto-upload="false"
+            :on-change="handleAttachmentChange"
+            :file-list="attachmentList"
+            :limit="10"
+            accept=".doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx"
+          >
+            <template #trigger>
+              <el-button type="primary">
+                <el-icon><Upload /></el-icon>
+                选择附件
+              </el-button>
+            </template>
+            <template #tip>
+              <div class="el-upload__tip">
+                支持 Word (.doc, .docx)、PowerPoint (.ppt, .pptx)、PDF (.pdf)、Excel (.xls, .xlsx)，单个文件最大 50MB
+              </div>
+            </template>
+          </el-upload>
+          <div v-if="attachmentList.length > 0" class="attachment-list">
+            <div
+              v-for="(file, index) in attachmentList"
+              :key="index"
+              class="attachment-item"
+            >
+              <el-icon><Document /></el-icon>
+              <span class="attachment-name">{{ file.name }}</span>
+              <span class="attachment-size">{{ formatFileSize(file.size) }}</span>
+              <el-button
+                type="danger"
+                link
+                size="small"
+                @click="removeAttachment(index)"
+              >
+                删除
+              </el-button>
+            </div>
+          </div>
+        </el-form-item>
       </el-form>
     </el-card>
   </div>
@@ -78,7 +122,8 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
+import type { FormInstance, FormRules, UploadFile, UploadFiles } from 'element-plus'
+import { Upload, Document } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import MarkdownEditor from '@/components/business/MarkdownEditor.vue'
 import {
@@ -86,8 +131,10 @@ import {
   updateArticle,
   getArticle,
   getCategories,
+  addArticleAttachment,
   type Article,
 } from '@/api/article'
+import { uploadAttachment } from '@/api/upload'
 
 const router = useRouter()
 const route = useRoute()
@@ -152,20 +199,28 @@ const handleSave = async () => {
     
     saving.value = true
     try {
+      let articleId: number
       if (isEdit.value) {
-        const articleId = parseInt(route.params.id as string)
+        articleId = parseInt(route.params.id as string)
         await updateArticle(articleId, {
           ...form,
           is_published: true,
         })
         ElMessage.success('文章更新成功')
       } else {
-        await createArticle({
+        const article = await createArticle({
           ...form,
           is_published: true,
         })
+        articleId = article.id
         ElMessage.success('文章发布成功')
       }
+      
+      // 上传附件
+      if (attachmentList.value.length > 0) {
+        await uploadAttachments(articleId)
+      }
+      
       router.push({ name: 'ArticleList' })
     } catch (error: any) {
       ElMessage.error(error.response?.data?.detail || '操作失败')
@@ -190,10 +245,16 @@ const handleSaveDraft = async () => {
   
   saving.value = true
   try {
-    await createArticle({
+    const article = await createArticle({
       ...form,
       is_published: false,
     })
+    
+    // 上传附件
+    if (attachmentList.value.length > 0) {
+      await uploadAttachments(article.id)
+    }
+    
     ElMessage.success('草稿保存成功')
     router.push({ name: 'ArticleList' })
   } catch (error: any) {
@@ -205,6 +266,49 @@ const handleSaveDraft = async () => {
 
 const handleCancel = () => {
   router.back()
+}
+
+const handleAttachmentChange = (file: UploadFile, fileList: UploadFiles) => {
+  attachmentList.value = fileList.map(f => ({
+    name: f.name,
+    size: f.size || 0,
+    raw: f.raw,
+    uploadData: f.uploadData,
+  }))
+}
+
+const removeAttachment = (index: number) => {
+  attachmentList.value.splice(index, 1)
+}
+
+const formatFileSize = (size: number) => {
+  if (size < 1024) return size + ' B'
+  if (size < 1024 * 1024) return (size / 1024).toFixed(2) + ' KB'
+  return (size / (1024 * 1024)).toFixed(2) + ' MB'
+}
+
+const uploadAttachments = async (articleId: number) => {
+  const uploadPromises = attachmentList.value
+    .filter(file => file.raw && !file.uploadData)
+    .map(async (file) => {
+      try {
+        const uploadResult = await uploadAttachment(file.raw!)
+        const attachmentData = await addArticleAttachment(articleId, {
+          file_path: uploadResult.url,
+          filename: uploadResult.filename,
+          file_size: uploadResult.size,
+          file_type: uploadResult.type,
+          mime_type: uploadResult.mime_type,
+        })
+        file.uploadData = attachmentData
+        return attachmentData
+      } catch (error: any) {
+        ElMessage.error(`附件 ${file.name} 上传失败: ${error.response?.data?.detail || error.message}`)
+        throw error
+      }
+    })
+  
+  await Promise.all(uploadPromises)
 }
 
 onMounted(() => {
@@ -246,5 +350,36 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   margin-top: 5px;
+}
+
+.attachment-list {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: white;
+  border-radius: 4px;
+}
+
+.attachment-item:last-child {
+  margin-bottom: 0;
+}
+
+.attachment-name {
+  flex: 1;
+  font-size: 14px;
+}
+
+.attachment-size {
+  font-size: 12px;
+  color: #909399;
 }
 </style>
