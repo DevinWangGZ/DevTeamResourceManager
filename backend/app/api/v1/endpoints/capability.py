@@ -4,13 +4,12 @@ from sqlalchemy.orm import Session
 from typing import List, Dict
 from decimal import Decimal
 
-from app.api.deps import get_db, get_current_user
-from app.core.permissions import require_development_lead_or_admin
+from app.api.deps import get_db
+from app.core.permissions import get_current_development_lead
 from app.models.user import User
 from app.models.skill import Skill, Proficiency
 from app.models.user_sequence import UserSequence
 from app.models.workload_statistic import WorkloadStatistic
-from app.core.exceptions import PermissionDeniedError
 
 router = APIRouter()
 
@@ -18,16 +17,13 @@ router = APIRouter()
 @router.get("/skill-matrix", response_model=dict)
 async def get_skill_matrix(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_development_lead)
 ):
     """
     获取团队技能矩阵
     
     返回所有开发人员的技能分布情况
     """
-    # 权限检查：只有开发组长和系统管理员可以查看
-    if current_user.role not in ["development_lead", "system_admin"]:
-        raise PermissionDeniedError("只有开发组长和系统管理员可以查看团队能力洞察")
     
     # 获取所有开发人员
     developers = db.query(User).filter(
@@ -75,16 +71,13 @@ async def get_skill_matrix(
 @router.get("/talent-ladder", response_model=dict)
 async def get_talent_ladder(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_development_lead)
 ):
     """
     获取人才梯队分析
     
     基于序列等级和技能水平分析人才梯队
     """
-    # 权限检查
-    if current_user.role not in ["development_lead", "system_admin"]:
-        raise PermissionDeniedError("只有开发组长和系统管理员可以查看团队能力洞察")
     
     # 获取所有开发人员
     developers = db.query(User).filter(
@@ -159,16 +152,13 @@ async def get_talent_ladder(
 @router.get("/capability-distribution", response_model=dict)
 async def get_capability_distribution(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_development_lead)
 ):
     """
     获取团队能力分布
     
     统计技能熟练度分布、序列等级分布等
     """
-    # 权限检查
-    if current_user.role not in ["development_lead", "system_admin"]:
-        raise PermissionDeniedError("只有开发组长和系统管理员可以查看团队能力洞察")
     
     # 获取所有开发人员
     developers = db.query(User).filter(
