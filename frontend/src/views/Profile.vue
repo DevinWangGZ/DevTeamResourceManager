@@ -141,6 +141,51 @@
             </el-table>
           </el-card>
         </el-tab-pane>
+
+        <!-- 修改密码 -->
+        <el-tab-pane label="修改密码" name="password">
+          <el-card shadow="never">
+            <h3>修改密码</h3>
+            <el-form 
+              ref="passwordFormRef" 
+              :model="passwordForm" 
+              :rules="passwordRules" 
+              label-width="100px"
+              style="max-width: 600px; margin-top: 20px;"
+            >
+              <el-form-item label="原密码" prop="old_password">
+                <el-input
+                  v-model="passwordForm.old_password"
+                  type="password"
+                  placeholder="请输入原密码"
+                  show-password
+                />
+              </el-form-item>
+              <el-form-item label="新密码" prop="new_password">
+                <el-input
+                  v-model="passwordForm.new_password"
+                  type="password"
+                  placeholder="请输入新密码（至少8个字符）"
+                  show-password
+                />
+              </el-form-item>
+              <el-form-item label="确认新密码" prop="confirm_password">
+                <el-input
+                  v-model="passwordForm.confirm_password"
+                  type="password"
+                  placeholder="请再次输入新密码"
+                  show-password
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="passwordChanging" @click="handleChangePassword">
+                  修改密码
+                </el-button>
+                <el-button @click="resetPasswordForm">重置</el-button>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </el-tab-pane>
       </el-tabs>
     </el-card>
 
@@ -274,7 +319,7 @@ import {
   type UserSequence,
   type UserSequenceCreate,
 } from '@/api/userSequence'
-import { getCurrentUser, type UserInfo } from '@/api/auth'
+import { getCurrentUser, changePassword, type UserInfo, type PasswordChangeForm } from '@/api/auth'
 import { updateUser } from '@/api/user'
 
 const userStore = useUserStore()
@@ -342,6 +387,35 @@ const experienceRules: FormRules = {
 const sequenceRules: FormRules = {
   level: [{ required: true, message: '请输入序列等级', trigger: 'blur' }],
   unit_price: [{ required: true, message: '请输入单价', trigger: 'blur' }],
+}
+
+// 密码相关
+const passwordFormRef = ref<FormInstance>()
+const passwordChanging = ref(false)
+const passwordForm = reactive({
+  old_password: '',
+  new_password: '',
+  confirm_password: '',
+})
+
+const validateConfirmPassword = (rule: any, value: any, callback: any) => {
+  if (value !== passwordForm.new_password) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const passwordRules: FormRules = {
+  old_password: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
+  new_password: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 8, message: '密码长度至少为8个字符', trigger: 'blur' },
+  ],
+  confirm_password: [
+    { required: true, message: '请确认新密码', trigger: 'blur' },
+    { validator: validateConfirmPassword, trigger: 'blur' },
+  ],
 }
 
 const getRoleName = (role: string) => {
@@ -607,6 +681,35 @@ const resetSequenceForm = () => {
   editingSequence.value = null
   sequenceForm.level = ''
   sequenceForm.unit_price = 0
+}
+
+const handleChangePassword = async () => {
+  if (!passwordFormRef.value) return
+
+  await passwordFormRef.value.validate(async (valid) => {
+    if (valid) {
+      passwordChanging.value = true
+      try {
+        await changePassword({
+          old_password: passwordForm.old_password,
+          new_password: passwordForm.new_password,
+        })
+        ElMessage.success('密码修改成功')
+        resetPasswordForm()
+      } catch (error: any) {
+        ElMessage.error(error.response?.data?.detail || '密码修改失败')
+      } finally {
+        passwordChanging.value = false
+      }
+    }
+  })
+}
+
+const resetPasswordForm = () => {
+  passwordFormRef.value?.resetFields()
+  passwordForm.old_password = ''
+  passwordForm.new_password = ''
+  passwordForm.confirm_password = ''
 }
 
 onMounted(() => {

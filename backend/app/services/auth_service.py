@@ -68,8 +68,9 @@ def create_user(
 
 
 def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
-    """根据ID获取用户"""
-    return db.query(User).filter(User.id == user_id).first()
+    """根据ID获取用户（包含角色信息）"""
+    from sqlalchemy.orm import joinedload
+    return db.query(User).options(joinedload(User.roles)).filter(User.id == user_id).first()
 
 
 def get_user_by_username(db: Session, username: str) -> Optional[User]:
@@ -84,3 +85,24 @@ def generate_token_for_user(user: User) -> str:
         data={"sub": str(user.id), "username": user.username, "role": user.role},
         expires_delta=access_token_expires
     )
+
+
+def change_password(
+    db: Session,
+    user: User,
+    old_password: str,
+    new_password: str
+) -> User:
+    """修改用户密码"""
+    # 验证旧密码
+    if not verify_password(old_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="原密码错误"
+        )
+    
+    # 更新密码
+    user.password_hash = get_password_hash(new_password)
+    db.commit()
+    db.refresh(user)
+    return user

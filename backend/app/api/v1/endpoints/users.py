@@ -15,6 +15,7 @@ from app.schemas.user import (
     UserRoleUpdate,
     UserRolesUpdate,
     UserListResponse,
+    UserCreate,
 )
 from app.services.user_service import (
     get_user,
@@ -25,6 +26,7 @@ from app.services.user_service import (
     remove_user_role,
     set_user_roles,
     delete_user,
+    create_user_by_admin,
 )
 from app.models.role import RoleType
 from app.models.user import User
@@ -207,6 +209,21 @@ async def set_user_roles_endpoint(
     设置用户角色列表（替换所有角色，仅系统管理员）
     """
     user = set_user_roles(db, user_id, roles_update.role_codes, current_user)
+    return UserResponse.from_user(user)
+
+
+@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="创建用户")
+async def create_user_endpoint(
+    user_data: UserCreate,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    创建新用户（仅系统管理员）
+    
+    使用默认密码创建用户，用户首次登录后应修改密码
+    """
+    user = create_user_by_admin(db, user_data, current_user)
     return UserResponse.from_user(user)
 
 

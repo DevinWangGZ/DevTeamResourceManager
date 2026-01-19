@@ -23,6 +23,7 @@ export interface UserInfo {
   email: string
   full_name: string | null
   role: string
+  role_codes?: string[]
   status_tag: string | null
   is_active: boolean
 }
@@ -64,5 +65,21 @@ export const getCurrentUser = (): Promise<UserInfo> => {
   return request({
     url: '/api/v1/auth/me',
     method: 'get',
+  })
+}
+
+/**
+ * 修改密码
+ */
+export interface PasswordChangeForm {
+  old_password: string
+  new_password: string
+}
+
+export const changePassword = (data: PasswordChangeForm): Promise<{ message: string }> => {
+  return request({
+    url: '/api/v1/auth/change-password',
+    method: 'post',
+    data,
   })
 }

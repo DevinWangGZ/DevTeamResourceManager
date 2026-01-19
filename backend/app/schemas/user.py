@@ -68,3 +68,12 @@ class UserListResponse(BaseModel):
     """用户列表响应"""
     total: int
     items: list[UserResponse]
+
+
+class UserCreate(BaseModel):
+    """创建用户请求（仅管理员）"""
+    username: str
+    email: EmailStr
+    full_name: Optional[str] = None
+    role_codes: List[str] = []  # 角色代码列表，默认为空（将创建为开发人员）
+    is_active: bool = True

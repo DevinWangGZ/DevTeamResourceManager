@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30 * 24 * 60  # 30天
     
+    # 用户默认密码（管理员创建用户时使用）
+    DEFAULT_USER_PASSWORD: str = "12345678"
+    
     # Redis配置（可选）
     REDIS_URL: Optional[str] = None
     

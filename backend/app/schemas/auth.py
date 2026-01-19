@@ -40,3 +40,9 @@ class UserCreate(BaseModel):
     full_name: Optional[str] = None
     role: UserRole = UserRole.DEVELOPER
     status_tag: Optional[str] = None
+
+
+class PasswordChange(BaseModel):
+    """修改密码请求"""
+    old_password: str
+    new_password: str

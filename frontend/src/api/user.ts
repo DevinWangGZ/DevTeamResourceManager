@@ -32,3 +32,32 @@ export function getUsers(params?: {
 export function updateUser(data: UserUpdate): Promise<UserInfo> {
   return request.put('/api/v1/users/me', data)
 }
+
+/**
+ * 创建用户（仅管理员）
+ */
+export interface UserCreateParams {
+  username: string
+  email: string
+  full_name?: string
+  role_codes?: string[]
+  is_active?: boolean
+}
+
+export function createUser(data: UserCreateParams): Promise<UserInfo> {
+  return request.post('/api/v1/users', data)
+}
+
+/**
+ * 删除用户（仅管理员）
+ */
+export function deleteUser(userId: number): Promise<void> {
+  return request.delete(`/api/v1/users/${userId}`)
+}
+
+/**
+ * 更新用户信息（仅管理员）
+ */
+export function updateUserByAdmin(userId: number, data: UserUpdate & { is_active?: boolean }): Promise<UserInfo> {
+  return request.put(`/api/v1/users/${userId}`, data)
+}

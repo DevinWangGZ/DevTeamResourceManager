@@ -20,6 +20,8 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme)
 ) -> User:
     """获取当前用户依赖"""
+    from sqlalchemy.orm import joinedload
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="无法验证凭证",
@@ -34,7 +36,10 @@ async def get_current_user(
     except (JWTError, ValueError, TypeError):
         raise credentials_exception
     
-    user = get_user_by_id(db, user_id_int)
+    # 使用 joinedload 加载 roles 关系
+    from app.models.user import User
+    user = db.query(User).options(joinedload(User.roles)).filter(User.id == user_id_int).first()
+    
     if user is None:
         raise credentials_exception
     

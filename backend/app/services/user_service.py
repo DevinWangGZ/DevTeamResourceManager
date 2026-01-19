@@ -5,8 +5,10 @@ from fastapi import HTTPException, status
 
 from app.models.user import User, UserRole
 from app.models.role import Role, RoleType
-from app.schemas.user import UserUpdate, UserRoleUpdate
+from app.schemas.user import UserUpdate, UserRoleUpdate, UserCreate
 from app.services.role_service import RoleService
+from app.services.auth_service import create_user
+from app.core.config import settings
 
 
 def get_user(db: Session, user_id: int) -> Optional[User]:
@@ -243,3 +245,50 @@ def delete_user(
     db.delete(user)
     db.commit()
     return True
+
+
+def create_user_by_admin(
+    db: Session,
+    user_data: UserCreate,
+    current_user: User
+) -> User:
+    """管理员创建用户（使用默认密码）"""
+    # 权限检查：只有管理员可以创建用户
+    if not current_user.has_role(RoleType.SYSTEM_ADMIN.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有管理员可以创建用户"
+        )
+    
+    # 确定角色
+    role = UserRole.DEVELOPER
+    if user_data.role_codes:
+        # 如果指定了角色代码，使用第一个角色代码对应的UserRole
+        # 这里简化处理，实际应该根据role_codes设置角色
+        role = UserRole.DEVELOPER
+    
+    # 使用默认密码创建用户
+    user = create_user(
+        db=db,
+        username=user_data.username,
+        email=user_data.email,
+        password=settings.DEFAULT_USER_PASSWORD,
+        full_name=user_data.full_name,
+        role=role
+    )
+    
+    # 设置激活状态
+    user.is_active = user_data.is_active
+    db.commit()
+    db.refresh(user)
+    
+    # 如果指定了角色代码，设置角色
+    if user_data.role_codes:
+        user.roles.clear()
+        for role_code in user_data.role_codes:
+            role_obj = RoleService.get_or_create_role_by_code(db, role_code)
+            user.roles.append(role_obj)
+        db.commit()
+        db.refresh(user)
+    
+    return user
