@@ -32,15 +32,16 @@ app = FastAPI(
 # 编码中间件（确保UTF-8编码）
 app.add_middleware(EncodingMiddleware)
 
-# CORS配置
-if settings.BACKEND_CORS_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.BACKEND_CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# CORS配置：放通所有 IP/域名访问
+# 使用正则匹配任意 http/https 来源，以支持 allow_credentials=True
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[],  # 由 allow_origin_regex 覆盖
+    allow_origin_regex=r"https?://.*",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 全局异常处理器
 @app.exception_handler(AppException)

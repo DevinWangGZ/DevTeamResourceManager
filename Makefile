@@ -1,11 +1,12 @@
-.PHONY: help setup-backend setup-frontend dev-backend dev-frontend test install check
+.PHONY: help setup-backend setup-frontend dev-backend dev-frontend dev-frontend-remote test install check
 
 help:
 	@echo "可用命令："
-	@echo "  make setup-backend    - 设置后端环境"
-	@echo "  make setup-frontend   - 设置前端环境"
-	@echo "  make dev-backend      - 启动后端开发服务器"
-	@echo "  make dev-frontend     - 启动前端开发服务器"
+	@echo "  make setup-backend        - 设置后端环境"
+	@echo "  make setup-frontend       - 设置前端环境"
+	@echo "  make dev-backend          - 启动后端开发服务器"
+	@echo "  make dev-frontend         - 启动前端开发服务器（连接本地 localhost:8000）"
+	@echo "  make dev-frontend-remote  - 启动前端开发服务器（连接远程 10.254.68.215:8000）"
 	@echo "  make install          - 安装所有依赖"
 	@echo "  make check            - 检查服务状态"
 
@@ -35,6 +36,11 @@ dev-frontend:
 	@echo "启动前端开发服务器..."
 	@echo "前端地址: http://localhost:5173"
 	cd frontend && npm run dev
+
+dev-frontend-remote:
+	@echo "启动前端开发服务器（连接远程后端 10.254.68.215:8000）..."
+	@echo "前端地址: http://localhost:5173"
+	cd frontend && VITE_API_BASE_URL=http://10.254.68.215:8000 npm run dev
 
 install: setup-backend setup-frontend
 	@echo "所有依赖已安装完成！"
