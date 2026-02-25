@@ -5,7 +5,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <h2>创建任务</h2>
+          <h2>{{ isEdit ? '编辑任务' : '创建任务' }}</h2>
         </div>
       </template>
 
@@ -96,9 +96,9 @@
       <!-- 操作按钮 -->
       <div class="actions">
         <el-button @click="handleCancel">取消</el-button>
-        <el-button @click="handleSaveDraft">保存草稿</el-button>
+        <el-button v-if="!isEdit" @click="handleSaveDraft">保存草稿</el-button>
         <el-button type="primary" :loading="submitting" @click="handleSubmit">
-          创建任务
+          {{ isEdit ? '保存修改' : '创建任务' }}
         </el-button>
       </div>
     </el-card>
@@ -106,15 +106,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import MarkdownEditor from '@/components/business/MarkdownEditor.vue'
-import { createTask, type TaskCreate } from '@/api/task'
+import { createTask, updateTask, getTask, type TaskCreate } from '@/api/task'
 import { getProjects, type Project } from '@/api/project'
 
 const router = useRouter()
+const route = useRoute()
+
+const isEdit = computed(() => !!route.params.id)
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -174,6 +177,28 @@ const loadProjects = async () => {
     ElMessage.error(error.response?.data?.detail || '加载项目列表失败')
   } finally {
     projectLoading.value = false
+  }
+}
+
+// 加载任务详情（编辑模式）
+const loadTaskDetail = async () => {
+  if (!isEdit.value) return
+  loading.value = true
+  try {
+    const taskId = parseInt(route.params.id as string)
+    const task = await getTask(taskId)
+    Object.assign(form, {
+      title: task.title || '',
+      description: task.description || '',
+      project_id: task.project_id,
+      estimated_man_days: task.estimated_man_days || 0,
+      required_skills: task.required_skills || '',
+      deadline: task.deadline,
+    })
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '加载任务详情失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -237,13 +262,18 @@ const handleSubmit = async () => {
     if (valid) {
       submitting.value = true
       try {
-        await createTask(form)
-        ElMessage.success('任务创建成功')
-        clearDraft()
-        // 跳转到任务列表
+        if (isEdit.value) {
+          const taskId = parseInt(route.params.id as string)
+          await updateTask(taskId, form)
+          ElMessage.success('任务更新成功')
+        } else {
+          await createTask(form)
+          ElMessage.success('任务创建成功')
+          clearDraft()
+        }
         router.push('/tasks')
       } catch (error: any) {
-        ElMessage.error(error.response?.data?.detail || '创建任务失败')
+        ElMessage.error(error.response?.data?.detail || (isEdit.value ? '更新任务失败' : '创建任务失败'))
       } finally {
         submitting.value = false
       }
@@ -286,8 +316,12 @@ const stopAutoSave = () => {
 
 onMounted(() => {
   loadProjects()
-  loadDraft()
-  startAutoSave()
+  if (isEdit.value) {
+    loadTaskDetail()
+  } else {
+    loadDraft()
+    startAutoSave()
+  }
 })
 
 onBeforeUnmount(() => {

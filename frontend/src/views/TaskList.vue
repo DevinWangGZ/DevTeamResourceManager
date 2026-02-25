@@ -149,10 +149,28 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="viewTask(row.id)">
               查看
+            </el-button>
+            <el-button
+              v-if="canEdit(row)"
+              link
+              type="primary"
+              size="small"
+              @click="editTask(row.id)"
+            >
+              编辑
+            </el-button>
+            <el-button
+              v-if="canPublish(row)"
+              link
+              type="success"
+              size="small"
+              @click="handlePublish(row.id)"
+            >
+              发布
             </el-button>
             <el-button
               v-if="canClaim(row)"
@@ -268,6 +286,7 @@ import {
   submitTask,
   confirmTask,
   deleteTask,
+  publishTask,
   type Task,
 } from '@/api/task'
 import { exportTasks } from '@/api/export'
@@ -382,6 +401,26 @@ const canConfirm = (task: Task) => {
 const canDelete = (task: Task) => {
   // 只有创建者可以删除自己创建的任务
   return task.creator_id === userStore.userInfo?.id
+}
+
+// 草稿状态且是创建者或PM/管理员才可编辑
+const canEdit = (task: Task) => {
+  if (task.status !== 'draft') return false
+  return (
+    task.creator_id === userStore.userInfo?.id ||
+    userStore.userInfo?.role === 'project_manager' ||
+    userStore.userInfo?.role === 'system_admin'
+  )
+}
+
+// 草稿状态且是创建者或PM/管理员才可发布
+const canPublish = (task: Task) => {
+  if (task.status !== 'draft') return false
+  return (
+    task.creator_id === userStore.userInfo?.id ||
+    userStore.userInfo?.role === 'project_manager' ||
+    userStore.userInfo?.role === 'system_admin'
+  )
 }
 
 const loadTasks = async () => {
@@ -573,6 +612,27 @@ const handleConfirm = async (taskId: number) => {
 
 const viewTask = (taskId: number) => {
   router.push({ name: 'TaskDetail', params: { id: taskId } })
+}
+
+const editTask = (taskId: number) => {
+  router.push({ name: 'TaskEdit', params: { id: taskId } })
+}
+
+const handlePublish = async (taskId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要发布此任务吗？发布后开发者将可以认领该任务。', '发布确认', {
+      confirmButtonText: '确定发布',
+      cancelButtonText: '取消',
+      type: 'info',
+    })
+    await publishTask(taskId)
+    ElMessage.success('任务发布成功')
+    loadTasks()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '发布任务失败')
+    }
+  }
 }
 
 const goToCreate = () => {
