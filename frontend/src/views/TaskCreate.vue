@@ -146,18 +146,7 @@ const rules: FormRules = {
   deadline: [
     {
       validator: (rule, value, callback) => {
-        if (value) {
-          const deadline = new Date(value)
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          if (deadline < today) {
-            callback(new Error('截止时间必须是未来日期'))
-          } else {
-            callback()
-          }
-        } else {
-          callback()
-        }
+        callback()
       },
       trigger: 'change',
     },
