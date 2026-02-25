@@ -137,8 +137,144 @@
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
+
+        <!-- 任务配合人 -->
+        <el-card
+          class="collaborators-card"
+          shadow="never"
+          v-if="task.assignee_id"
+        >
+          <template #header>
+            <div class="collaborators-header">
+              <span>任务配合人</span>
+              <div class="collaborators-header-right">
+                <span class="man-days-summary">
+                  已分配 <b>{{ collaboratorsTotalDays }}</b> / 拟投入 <b>{{ task.estimated_man_days }}</b> 人天
+                </span>
+                <el-button
+                  v-if="canManageCollaborators"
+                  type="primary"
+                  size="small"
+                  @click="openAddCollaboratorDialog"
+                >
+                  + 添加配合人
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="collaborators.length === 0" class="collaborators-empty">
+            <el-empty description="暂无配合人" :image-size="60" />
+          </div>
+          <el-table v-else :data="collaborators" size="small">
+            <el-table-column label="配合人" min-width="120">
+              <template #default="{ row }">
+                <span>{{ row.user_full_name || row.user_name }}</span>
+                <el-tag size="small" type="info" style="margin-left: 6px">{{ row.user_name }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="分配人天" width="120">
+              <template #default="{ row }">
+                {{ row.allocated_man_days }} 人天
+              </template>
+            </el-table-column>
+            <el-table-column v-if="canManageCollaborators" label="操作" width="140" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  @click="openEditCollaborator(row)"
+                >
+                  调整人天
+                </el-button>
+                <el-button
+                  link
+                  type="danger"
+                  size="small"
+                  @click="handleRemoveCollaborator(row)"
+                >
+                  移除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
       </div>
     </el-card>
+
+    <!-- 添加配合人对话框 -->
+    <el-dialog v-model="showAddCollaboratorDialog" title="添加配合人" width="480px" @close="resetAddForm">
+      <el-form ref="addFormRef" :model="addForm" :rules="addFormRules" label-width="100px">
+        <el-form-item label="选择配合人" prop="user_id">
+          <el-select
+            v-model="addForm.user_id"
+            filterable
+            placeholder="搜索姓名或用户名"
+            style="width: 100%"
+            :loading="developerListLoading"
+            no-match-text="未找到匹配的开发人员"
+            no-data-text="暂无开发人员数据"
+          >
+            <el-option
+              v-for="dev in availableDevelopers"
+              :key="dev.id"
+              :label="dev.full_name ? `${dev.full_name}（${dev.username}）` : dev.username"
+              :value="dev.id"
+            >
+              <div class="developer-option">
+                <span class="dev-name">{{ dev.full_name || dev.username }}</span>
+                <span class="dev-username">@{{ dev.username }}</span>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="分配人天" prop="allocated_man_days">
+          <el-input-number
+            v-model="addForm.allocated_man_days"
+            :min="0.01"
+            :max="remainingManDays || 0.01"
+            :precision="2"
+            style="width: 100%"
+          />
+          <div class="form-hint">
+            剩余可分配：<b>{{ remainingManDays }}</b> 人天
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddCollaboratorDialog = false">取消</el-button>
+        <el-button type="primary" :loading="collaboratorLoading" @click="handleAddCollaborator">
+          确认添加
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑配合人人天对话框 -->
+    <el-dialog v-model="showEditCollaboratorDialog" title="调整分配人天" width="440px">
+      <el-form label-width="100px">
+        <el-form-item label="配合人">
+          <span>{{ editCollaborator?.user_full_name || editCollaborator?.user_name }}</span>
+        </el-form-item>
+        <el-form-item label="分配人天">
+          <el-input-number
+            v-model="editManDays"
+            :min="0.01"
+            :precision="2"
+            style="width: 100%"
+          />
+          <div class="form-hint">
+            剩余可分配（不含本条）：{{ remainingManDaysForEdit }} 人天
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditCollaboratorDialog = false">取消</el-button>
+        <el-button type="primary" :loading="collaboratorLoading" @click="handleUpdateCollaborator">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- 评估对话框 -->
     <el-dialog v-model="showEvaluateDialog" title="评估任务" width="500px">
@@ -180,9 +316,9 @@
 <script setup lang="ts">
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import MarkdownViewer from '@/components/ui/MarkdownViewer.vue'
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, type FormInstance, type FormRules } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { StarFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import {
@@ -195,8 +331,15 @@ import {
   confirmTask,
   pinTask,
   getTaskSchedule,
+  getCollaborators,
+  addCollaborator,
+  updateCollaborator,
+  removeCollaborator,
   type TaskDetail,
+  type Collaborator,
 } from '@/api/task'
+import { getUsers, type UserListResponse } from '@/api/user'
+import type { UserInfo } from '@/api/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -217,6 +360,71 @@ const submitForm = reactive({
 const submitRules: FormRules = {
   actual_man_days: [{ required: true, message: '请输入实际投入人天', trigger: 'blur' }],
 }
+
+// ---- 配合人 ----
+const collaborators = ref<Collaborator[]>([])
+const collaboratorLoading = ref(false)
+const showAddCollaboratorDialog = ref(false)
+const showEditCollaboratorDialog = ref(false)
+const editCollaborator = ref<Collaborator | null>(null)
+const editManDays = ref(0)
+const addFormRef = ref<FormInstance>()
+const addForm = reactive({ user_id: undefined as number | undefined, allocated_man_days: 1 })
+const addFormRules: FormRules = {
+  user_id: [{ required: true, message: '请选择配合人', trigger: 'change' }],
+  allocated_man_days: [{ required: true, message: '请输入分配人天', trigger: 'blur' }],
+}
+
+// 开发人员列表（用于下拉搜索）
+const developerList = ref<UserInfo[]>([])
+const developerListLoading = ref(false)
+
+// 过滤掉认领人和已添加的配合人
+const availableDevelopers = computed(() => {
+  const excludeIds = new Set<number>()
+  if (task.value?.assignee_id) excludeIds.add(task.value.assignee_id)
+  collaborators.value.forEach(c => excludeIds.add(c.user_id))
+  return developerList.value.filter(d => !excludeIds.has(d.id))
+})
+
+const loadDeveloperList = async () => {
+  developerListLoading.value = true
+  try {
+    const res = await getUsers({ role: 'developer', limit: 100 })
+    developerList.value = res.items
+  } catch {
+    // 加载失败不阻断流程
+  } finally {
+    developerListLoading.value = false
+  }
+}
+
+const collaboratorsTotalDays = computed(() =>
+  collaborators.value.reduce((sum, c) => sum + Number(c.allocated_man_days), 0)
+)
+
+const remainingManDays = computed(() => {
+  const total = Number(task.value?.estimated_man_days || 0)
+  return Math.max(0, total - collaboratorsTotalDays.value)
+})
+
+const remainingManDaysForEdit = computed(() => {
+  if (!editCollaborator.value) return 0
+  const total = Number(task.value?.estimated_man_days || 0)
+  const others = collaborators.value
+    .filter(c => c.user_id !== editCollaborator.value!.user_id)
+    .reduce((sum, c) => sum + Number(c.allocated_man_days), 0)
+  return Math.max(0, total - others)
+})
+
+const canManageCollaborators = computed(() => {
+  if (!task.value || !userStore.userInfo) return false
+  const activeStatuses = ['claimed', 'in_progress']
+  return (
+    activeStatuses.includes(task.value.status) &&
+    task.value.assignee_id === userStore.userInfo.id
+  )
+})
 
 const getStatusText = (status?: string) => {
   if (!status) return ''
@@ -342,19 +550,95 @@ const loadTask = async () => {
   loading.value = true
   try {
     task.value = await getTask(taskId)
-    // 加载排期信息
     if (task.value.assignee_id) {
-      try {
-        schedule.value = await getTaskSchedule(taskId)
-      } catch (error) {
-        // 排期信息可能不存在，忽略错误
-      }
+      try { schedule.value = await getTaskSchedule(taskId) } catch {}
+      try { collaborators.value = await getCollaborators(taskId) } catch {}
     }
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '加载任务详情失败')
     router.push('/tasks')
   } finally {
     loading.value = false
+  }
+}
+
+const loadCollaborators = async () => {
+  if (!task.value) return
+  try {
+    collaborators.value = await getCollaborators(task.value.id)
+  } catch {}
+}
+
+const openAddCollaboratorDialog = async () => {
+  await loadDeveloperList()
+  showAddCollaboratorDialog.value = true
+}
+
+const resetAddForm = () => {
+  addFormRef.value?.resetFields()
+  addForm.user_id = undefined
+  addForm.allocated_man_days = 1
+}
+
+const handleAddCollaborator = async () => {
+  if (!addFormRef.value || !task.value) return
+  await addFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    collaboratorLoading.value = true
+    try {
+      await addCollaborator(task.value!.id, {
+        user_id: addForm.user_id!,
+        allocated_man_days: addForm.allocated_man_days,
+      })
+      ElMessage.success('配合人添加成功')
+      showAddCollaboratorDialog.value = false
+      await loadCollaborators()
+    } catch (error: any) {
+      ElMessage.error(error.response?.data?.detail || '添加配合人失败')
+    } finally {
+      collaboratorLoading.value = false
+    }
+  })
+}
+
+const openEditCollaborator = (row: Collaborator) => {
+  editCollaborator.value = row
+  editManDays.value = Number(row.allocated_man_days)
+  showEditCollaboratorDialog.value = true
+}
+
+const handleUpdateCollaborator = async () => {
+  if (!task.value || !editCollaborator.value) return
+  collaboratorLoading.value = true
+  try {
+    await updateCollaborator(task.value.id, editCollaborator.value.user_id, {
+      allocated_man_days: editManDays.value,
+    })
+    ElMessage.success('人天调整成功')
+    showEditCollaboratorDialog.value = false
+    await loadCollaborators()
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '更新失败')
+  } finally {
+    collaboratorLoading.value = false
+  }
+}
+
+const handleRemoveCollaborator = async (row: Collaborator) => {
+  if (!task.value) return
+  try {
+    await ElMessageBox.confirm(
+      `确定移除配合人「${row.user_full_name || row.user_name}」吗？`,
+      '移除配合人',
+      { confirmButtonText: '确定移除', cancelButtonText: '取消', type: 'warning' }
+    )
+    await removeCollaborator(task.value.id, row.user_id)
+    ElMessage.success('配合人已移除')
+    await loadCollaborators()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '移除失败')
+    }
   }
 }
 
@@ -523,8 +807,52 @@ onMounted(() => {
 
 .description-card,
 .skills-card,
-.schedule-card {
+.schedule-card,
+.collaborators-card {
   margin-top: 20px;
+}
+
+.collaborators-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.collaborators-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.man-days-summary {
+  font-size: 13px;
+  color: #666;
+}
+
+.collaborators-empty {
+  padding: 10px 0;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.developer-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.dev-name {
+  font-weight: 500;
+}
+
+.dev-username {
+  font-size: 12px;
+  color: #999;
 }
 
 .description-content {

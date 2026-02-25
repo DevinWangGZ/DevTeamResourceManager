@@ -110,3 +110,30 @@ class TaskFilterParams(BaseModel):
     required_skills: Optional[str] = None  # 所需技能（逗号分隔）
     page: int = Field(1, ge=1)
     page_size: int = Field(10, ge=1, le=100)
+
+
+# ---- 任务配合人相关 Schema ----
+
+class CollaboratorAdd(BaseModel):
+    """添加配合人请求"""
+    user_id: int = Field(..., description="配合人用户ID")
+    allocated_man_days: Decimal = Field(..., gt=0, description="分配人天数，必须大于0")
+
+
+class CollaboratorUpdate(BaseModel):
+    """更新配合人人天请求"""
+    allocated_man_days: Decimal = Field(..., gt=0, description="更新后的分配人天数")
+
+
+class CollaboratorResponse(BaseModel):
+    """配合人响应"""
+    id: int
+    task_id: int
+    user_id: int
+    user_name: Optional[str] = None
+    user_full_name: Optional[str] = None
+    allocated_man_days: Decimal
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

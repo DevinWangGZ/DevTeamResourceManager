@@ -489,12 +489,17 @@ class TaskService:
             # 消息创建失败不影响任务确认
             pass
 
-        # 任务确认后，自动更新工作量统计
+        # 任务确认后，自动更新主认领人工作量统计
         try:
             WorkloadStatisticService.update_statistic_on_task_confirmation(db, task)
         except Exception as e:
-            # 如果更新统计失败，记录错误但不影响任务确认
-            # 在实际生产环境中，应该记录日志
+            pass
+
+        # 任务确认后，将配合人的分配人天汇入各自工作量统计
+        try:
+            from app.services.task_collaborator_service import TaskCollaboratorService
+            TaskCollaboratorService.update_collaborators_workload_on_confirmation(db, task)
+        except Exception:
             pass
 
         # 任务确认后，更新项目产值统计
@@ -502,8 +507,6 @@ class TaskService:
             try:
                 ProjectOutputValueService.update_project_output_value(db, task.project_id)
             except Exception as e:
-                # 如果更新项目产值失败，记录错误但不影响任务确认
-                # 在实际生产环境中，应该记录日志
                 pass
 
         return task

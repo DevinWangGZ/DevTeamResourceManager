@@ -14,6 +14,7 @@ from app.models.workload_statistic import WorkloadStatistic
 from app.models.article import Article
 from app.models.article_attachment import ArticleAttachment
 from app.models.message import Message, MessageType
+from app.models.task_collaborator import TaskCollaborator
 
 __all__ = [
     "Base",
@@ -36,4 +37,5 @@ __all__ = [
     "ArticleAttachment",
     "Message",
     "MessageType",
+    "TaskCollaborator",
 ]

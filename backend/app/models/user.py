@@ -55,6 +55,7 @@ class User(Base):
     articles = relationship("Article", back_populates="author", cascade="all, delete-orphan")
     messages = relationship("Message", back_populates="user", cascade="all, delete-orphan")
     workload_statistics = relationship("WorkloadStatistic", back_populates="user", cascade="all, delete-orphan")
+    collaborating_tasks = relationship("TaskCollaborator", back_populates="user", cascade="all, delete-orphan")
 
     def has_role(self, role_code: str) -> bool:
         """检查用户是否拥有指定角色"""

@@ -217,6 +217,21 @@ CREATE TABLE IF NOT EXISTS messages (
     CONSTRAINT fk_messages_task FOREIGN KEY (related_task_id) REFERENCES tasks(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消息通知表';
 
+-- 13. 任务配合人表 (task_collaborators)
+CREATE TABLE IF NOT EXISTS task_collaborators (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    task_id INT NOT NULL COMMENT '任务ID',
+    user_id INT NOT NULL COMMENT '配合人用户ID',
+    allocated_man_days DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '分配给该配合人的人天数',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uq_task_collaborator (task_id, user_id),
+    INDEX idx_tc_task_id (task_id),
+    INDEX idx_tc_user_id (user_id),
+    CONSTRAINT fk_tc_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    CONSTRAINT fk_tc_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='任务配合人表，记录协作开发人员及其分配人天';
+
 -- ============================================
 -- 步骤4: 创建角色表和用户角色关联表
 -- ============================================

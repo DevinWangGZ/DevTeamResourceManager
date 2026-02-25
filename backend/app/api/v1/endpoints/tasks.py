@@ -19,9 +19,13 @@ from app.schemas.task import (
     TaskEvaluate,
     TaskSubmit,
     TaskConfirm,
-    TaskPin
+    TaskPin,
+    CollaboratorAdd,
+    CollaboratorUpdate,
+    CollaboratorResponse,
 )
 from app.services.task_service import TaskService
+from app.services.task_collaborator_service import TaskCollaboratorService
 from app.services.schedule_service import ScheduleService
 from app.models.task import TaskStatus
 from app.schemas.schedule import TaskScheduleResponse
@@ -349,6 +353,57 @@ async def pin_task(
         current_user.id
     )
     return task
+
+
+# ============================================================
+# 任务配合人接口
+# ============================================================
+
+@router.get("/{task_id}/collaborators", response_model=list[CollaboratorResponse])
+async def list_collaborators(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取任务的配合人列表"""
+    return TaskCollaboratorService.list_collaborators(db, task_id)
+
+
+@router.post("/{task_id}/collaborators", response_model=CollaboratorResponse, status_code=201)
+async def add_collaborator(
+    task_id: int,
+    data: CollaboratorAdd,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """添加任务配合人（仅任务认领人可操作）"""
+    return TaskCollaboratorService.add_collaborator(db, task_id, data, current_user.id)
+
+
+@router.put("/{task_id}/collaborators/{collaborator_user_id}", response_model=CollaboratorResponse)
+async def update_collaborator(
+    task_id: int,
+    collaborator_user_id: int,
+    data: CollaboratorUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """更新配合人的分配人天（仅任务认领人可操作）"""
+    return TaskCollaboratorService.update_collaborator(
+        db, task_id, collaborator_user_id, data, current_user.id
+    )
+
+
+@router.delete("/{task_id}/collaborators/{collaborator_user_id}", status_code=204)
+async def remove_collaborator(
+    task_id: int,
+    collaborator_user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """移除配合人（仅任务认领人可操作）"""
+    TaskCollaboratorService.remove_collaborator(db, task_id, collaborator_user_id, current_user.id)
+    return None
 
 
 @router.get("/{task_id}/schedule", response_model=TaskScheduleResponse)

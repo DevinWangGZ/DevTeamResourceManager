@@ -162,6 +162,53 @@ export function revertTaskToDraft(taskId: number): Promise<Task> {
   return request.post(`/api/v1/tasks/${taskId}/revert-draft`)
 }
 
+// ---- 任务配合人 ----
+
+export interface Collaborator {
+  id: number
+  task_id: number
+  user_id: number
+  user_name?: string
+  user_full_name?: string
+  allocated_man_days: number
+  created_at: string
+}
+
+/**
+ * 获取任务配合人列表
+ */
+export function getCollaborators(taskId: number): Promise<Collaborator[]> {
+  return request.get(`/api/v1/tasks/${taskId}/collaborators`)
+}
+
+/**
+ * 添加配合人
+ */
+export function addCollaborator(
+  taskId: number,
+  data: { user_id: number; allocated_man_days: number }
+): Promise<Collaborator> {
+  return request.post(`/api/v1/tasks/${taskId}/collaborators`, data)
+}
+
+/**
+ * 更新配合人分配人天
+ */
+export function updateCollaborator(
+  taskId: number,
+  collaboratorUserId: number,
+  data: { allocated_man_days: number }
+): Promise<Collaborator> {
+  return request.put(`/api/v1/tasks/${taskId}/collaborators/${collaboratorUserId}`, data)
+}
+
+/**
+ * 移除配合人
+ */
+export function removeCollaborator(taskId: number, collaboratorUserId: number): Promise<void> {
+  return request.delete(`/api/v1/tasks/${taskId}/collaborators/${collaboratorUserId}`)
+}
+
 /**
  * 认领任务
  */

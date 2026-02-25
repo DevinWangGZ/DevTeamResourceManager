@@ -55,6 +55,11 @@ class Task(Base):
         cascade="all, delete-orphan"
     )
     related_messages = relationship("Message", back_populates="related_task")
+    collaborators = relationship(
+        "TaskCollaborator",
+        back_populates="task",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Task(id={self.id}, title={self.title}, status={self.status}, assignee_id={self.assignee_id})>"
