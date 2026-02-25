@@ -40,7 +40,7 @@ dev-frontend:
 dev-frontend-remote:
 	@echo "启动前端开发服务器（连接远程后端 10.254.68.215:8000）..."
 	@echo "前端地址: http://localhost:5173"
-	cd frontend && VITE_API_BASE_URL=http://10.254.68.215:8000 npm run dev
+	cd frontend && VITE_API_BASE_URL=http://175.178.182.23:8000 npm run dev
 
 install: setup-backend setup-frontend
 	@echo "所有依赖已安装完成！"
