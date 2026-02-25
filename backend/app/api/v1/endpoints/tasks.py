@@ -225,6 +225,17 @@ async def publish_task(
     return task
 
 
+@router.post("/{task_id}/revert-draft", response_model=TaskResponse)
+async def revert_task_to_draft(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """将已发布任务退回草稿"""
+    task = TaskService.revert_to_draft(db, task_id, current_user.id, current_user.role)
+    return task
+
+
 @router.post("/{task_id}/claim", response_model=TaskResponse)
 async def claim_task(
     task_id: int,

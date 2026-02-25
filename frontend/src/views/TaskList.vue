@@ -173,6 +173,15 @@
               发布
             </el-button>
             <el-button
+              v-if="canRevertToDraft(row)"
+              link
+              type="warning"
+              size="small"
+              @click="handleRevertToDraft(row.id)"
+            >
+              退回草稿
+            </el-button>
+            <el-button
               v-if="canClaim(row)"
               link
               type="success"
@@ -287,6 +296,7 @@ import {
   confirmTask,
   deleteTask,
   publishTask,
+  revertTaskToDraft,
   type Task,
 } from '@/api/task'
 import { exportTasks } from '@/api/export'
@@ -416,6 +426,16 @@ const canEdit = (task: Task) => {
 // 草稿状态且是创建者或PM/管理员才可发布
 const canPublish = (task: Task) => {
   if (task.status !== 'draft') return false
+  return (
+    task.creator_id === userStore.userInfo?.id ||
+    userStore.userInfo?.role === 'project_manager' ||
+    userStore.userInfo?.role === 'system_admin'
+  )
+}
+
+// 已发布状态且是创建者或PM/管理员才可退回草稿
+const canRevertToDraft = (task: Task) => {
+  if (task.status !== 'published') return false
   return (
     task.creator_id === userStore.userInfo?.id ||
     userStore.userInfo?.role === 'project_manager' ||
@@ -616,6 +636,27 @@ const viewTask = (taskId: number) => {
 
 const editTask = (taskId: number) => {
   router.push({ name: 'TaskEdit', params: { id: taskId } })
+}
+
+const handleRevertToDraft = async (taskId: number) => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要将此任务退回草稿状态吗？退回后任务将从任务集市下架，需重新发布才能认领。',
+      '退回草稿确认',
+      {
+        confirmButtonText: '确定退回',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    await revertTaskToDraft(taskId)
+    ElMessage.success('任务已退回草稿')
+    loadTasks()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '退回草稿失败')
+    }
+  }
 }
 
 const handlePublish = async (taskId: number) => {

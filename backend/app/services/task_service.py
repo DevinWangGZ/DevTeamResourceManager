@@ -189,6 +189,41 @@ class TaskService:
         return task
 
     @staticmethod
+    def revert_to_draft(
+        db: Session,
+        task_id: int,
+        current_user_id: int,
+        current_user_role: str
+    ) -> Task:
+        """将已发布任务退回草稿"""
+        task = TaskService.get_task(db, task_id)
+        if not task:
+            raise NotFoundError("任务", str(task_id))
+
+        # 权限检查：只有创建者或项目经理/管理员可以退回
+        if task.creator_id != current_user_id:
+            if current_user_role not in ["project_manager", "system_admin"]:
+                raise PermissionDeniedError("只有任务创建者或项目经理可以退回任务")
+
+        # 状态检查：只有已发布状态可以退回草稿
+        if task.status != TaskStatus.PUBLISHED.value:
+            raise ValidationError("只有已发布状态的任务可以退回草稿")
+
+        old_status = task.status
+        task.status = TaskStatus.DRAFT.value
+        db.commit()
+        db.refresh(task)
+
+        # 创建消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            pass
+
+        return task
+
+    @staticmethod
     def claim_task(
         db: Session,
         task_id: int,
