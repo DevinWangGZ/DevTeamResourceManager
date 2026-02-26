@@ -91,7 +91,16 @@
             </div>
           </div>
 
-          <p class="ann-content">{{ ann.content }}</p>
+          <div
+            class="ann-content-wrap"
+            :class="{ clickable: isLong(ann.content) }"
+            @click="isLong(ann.content) && openDetail(ann)"
+          >
+            <p class="ann-content">{{ ann.content }}</p>
+            <span v-if="isLong(ann.content)" class="expand-link">
+              查看全文 <el-icon style="vertical-align: -2px; font-size: 12px"><ArrowRight /></el-icon>
+            </span>
+          </div>
 
           <div class="ann-footer">
             <div class="ann-author">
@@ -105,6 +114,45 @@
         </div>
       </div>
     </transition-group>
+
+    <!-- 全文查看弹窗 -->
+    <el-dialog
+      v-model="detailVisible"
+      :title="viewingAnn?.title"
+      width="600px"
+      class="ann-dialog ann-detail-dialog"
+    >
+      <template #header>
+        <div class="detail-dialog-header">
+          <el-tag
+            :type="priorityTagType(viewingAnn?.priority ?? 'normal')"
+            size="small"
+            effect="dark"
+            round
+            class="priority-tag"
+          >
+            {{ priorityLabel(viewingAnn?.priority ?? 'normal') }}
+          </el-tag>
+          <span class="detail-title">{{ viewingAnn?.title }}</span>
+        </div>
+      </template>
+
+      <div class="detail-content">{{ viewingAnn?.content }}</div>
+
+      <div class="detail-footer">
+        <div class="ann-author">
+          <el-avatar :size="20" class="author-avatar">
+            {{ (viewingAnn?.author_name || '?').charAt(0).toUpperCase() }}
+          </el-avatar>
+          <span>{{ viewingAnn?.author_name || '管理员' }}</span>
+        </div>
+        <span class="ann-time">{{ viewingAnn ? formatTime(viewingAnn.created_at) : '' }}</span>
+      </div>
+
+      <template #footer>
+        <el-button type="primary" @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 创建 / 编辑对话框 -->
     <el-dialog
@@ -178,6 +226,7 @@ import {
   InfoFilled,
   WarningFilled,
   CircleCloseFilled,
+  ArrowRight,
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import {
@@ -197,6 +246,20 @@ const announcements = ref<Announcement[]>([])
 const showAll = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
+
+// 全文查看
+const detailVisible = ref(false)
+const viewingAnn = ref<Announcement | null>(null)
+
+/** 内容超过此字符数视为"长文"，显示展开入口 */
+const LONG_THRESHOLD = 80
+
+const isLong = (content: string) => content.length > LONG_THRESHOLD
+
+const openDetail = (ann: Announcement) => {
+  viewingAnn.value = ann
+  detailVisible.value = true
+}
 const formRef = ref<FormInstance>()
 
 const isAdmin = computed(() =>
@@ -515,17 +578,81 @@ onMounted(loadAnnouncements)
 }
 
 /* ---- 内容 & 页脚 ---- */
+.ann-content-wrap {
+  margin-bottom: 10px;
+}
+
+.ann-content-wrap.clickable {
+  cursor: pointer;
+}
+
+.ann-content-wrap.clickable:hover .ann-content {
+  color: #374151;
+}
+
 .ann-content {
   font-size: 13px;
   color: #4b5563;
   line-height: 1.6;
-  margin: 0 0 10px 0;
+  margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  transition: color 0.15s;
+}
+
+.expand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  color: #667eea;
+  margin-top: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.expand-link:hover {
+  color: #764ba2;
+  text-decoration: underline;
+}
+
+/* ---- 全文弹窗 ---- */
+.detail-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+.detail-content {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+
+.detail-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
 }
 
 .ann-footer {
