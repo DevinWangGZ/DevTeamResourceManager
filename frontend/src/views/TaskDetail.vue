@@ -338,7 +338,7 @@ import {
   type TaskDetail,
   type Collaborator,
 } from '@/api/task'
-import { getUsers, type UserListResponse } from '@/api/user'
+import { getDevelopers } from '@/api/user'
 import type { UserInfo } from '@/api/auth'
 
 const route = useRoute()
@@ -390,7 +390,7 @@ const availableDevelopers = computed(() => {
 const loadDeveloperList = async () => {
   developerListLoading.value = true
   try {
-    const res = await getUsers({ role: 'developer', limit: 100 })
+    const res = await getDevelopers()
     developerList.value = res.items
   } catch {
     // 加载失败不阻断流程

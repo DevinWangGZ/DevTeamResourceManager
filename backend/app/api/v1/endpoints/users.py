@@ -108,6 +108,26 @@ async def list_users(
     }
 
 
+@router.get("/developers", response_model=UserListResponse, summary="获取开发人员列表（所有登录用户可访问）")
+async def list_developers(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取所有在职开发人员列表，用于配合人选择等协作场景。
+    任何已登录用户均可调用。
+    """
+    users, total = get_users(
+        db,
+        skip=0,
+        limit=100,
+        role=RoleType.DEVELOPER.value,
+        is_active=True,
+    )
+    items = [UserResponse.from_user(u) for u in users]
+    return {"total": total, "items": items}
+
+
 @router.get("/{user_id}", response_model=UserResponse, summary="获取用户详情")
 async def get_user_detail(
     user_id: int,

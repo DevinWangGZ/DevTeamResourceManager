@@ -27,6 +27,13 @@ export function getUsers(params?: {
 }
 
 /**
+ * 获取所有在职开发人员列表（任何登录用户可调用，用于协作人员选择）
+ */
+export function getDevelopers(): Promise<UserListResponse> {
+  return request.get('/api/v1/users/developers')
+}
+
+/**
  * 更新当前用户信息
  */
 export function updateUser(data: UserUpdate): Promise<UserInfo> {
