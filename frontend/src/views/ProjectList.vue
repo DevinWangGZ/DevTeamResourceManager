@@ -268,28 +268,24 @@ const editRules: FormRules = {
 
 // 权限判断
 const canCreate = computed(() => {
-  const role = userStore.userInfo?.role
-  return role === 'project_manager' || role === 'system_admin'
+  return userStore.hasAnyRole('project_manager', 'system_admin')
 })
 
 const canViewAll = computed(() => {
-  const role = userStore.userInfo?.role
-  return role === 'team_leader' || role === 'system_admin'
+  return userStore.hasAnyRole('team_leader', 'system_admin')
 })
 
 const canEdit = (project: Project) => {
-  const role = userStore.userInfo?.role
-  if (role === 'system_admin') return true
-  if (role === 'project_manager') {
+  if (userStore.hasRole('system_admin')) return true
+  if (userStore.hasRole('project_manager')) {
     return project.created_by === userStore.userInfo?.id
   }
   return false
 }
 
 const canDelete = (project: Project) => {
-  const role = userStore.userInfo?.role
-  if (role === 'system_admin') return true
-  if (role === 'project_manager') {
+  if (userStore.hasRole('system_admin')) return true
+  if (userStore.hasRole('project_manager')) {
     return project.created_by === userStore.userInfo?.id
   }
   return false
@@ -467,8 +463,7 @@ const viewProjectProgress = (projectId: number) => {
 }
 
 const canViewTasks = (project: Project) => {
-  // 项目经理和管理员可以查看任务执行视图
-  return userStore.userInfo?.role === 'project_manager' || userStore.userInfo?.role === 'system_admin'
+  return userStore.hasAnyRole('project_manager', 'system_admin')
 }
 
 const showProjectDetail = async (projectId: number) => {

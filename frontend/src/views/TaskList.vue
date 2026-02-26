@@ -391,14 +391,14 @@ const formatDate = (dateStr: string) => {
 }
 
 const canClaim = (task: Task) => {
-  return task.status === 'published' && userStore.userInfo?.role === 'developer'
+  return task.status === 'published' && userStore.hasRole('developer')
 }
 
 const canEvaluate = (task: Task) => {
   return (
     task.status === 'pending_eval' &&
     task.assignee_id === userStore.userInfo?.id &&
-    userStore.userInfo?.role === 'developer'
+    userStore.hasRole('developer')
   )
 }
 
@@ -406,20 +406,18 @@ const canSubmit = (task: Task) => {
   return (
     (task.status === 'claimed' || task.status === 'in_progress') &&
     task.assignee_id === userStore.userInfo?.id &&
-    userStore.userInfo?.role === 'developer'
+    userStore.hasRole('developer')
   )
 }
 
 const canConfirm = (task: Task) => {
   return (
     task.status === 'submitted' &&
-    (userStore.userInfo?.role === 'project_manager' ||
-      userStore.userInfo?.role === 'system_admin')
+    userStore.hasAnyRole('project_manager', 'system_admin')
   )
 }
 
 const canDelete = (task: Task) => {
-  // 只有创建者可以删除自己创建的任务
   return task.creator_id === userStore.userInfo?.id
 }
 
@@ -428,8 +426,7 @@ const canEdit = (task: Task) => {
   if (task.status !== 'draft') return false
   return (
     task.creator_id === userStore.userInfo?.id ||
-    userStore.userInfo?.role === 'project_manager' ||
-    userStore.userInfo?.role === 'system_admin'
+    userStore.hasAnyRole('project_manager', 'system_admin')
   )
 }
 
@@ -438,8 +435,7 @@ const canPublish = (task: Task) => {
   if (task.status !== 'draft') return false
   return (
     task.creator_id === userStore.userInfo?.id ||
-    userStore.userInfo?.role === 'project_manager' ||
-    userStore.userInfo?.role === 'system_admin'
+    userStore.hasAnyRole('project_manager', 'system_admin')
   )
 }
 
@@ -451,8 +447,7 @@ const canReturn = (task: Task) => {
   return (
     isAssignee(task) ||
     task.creator_id === userStore.userInfo?.id ||
-    userStore.userInfo?.role === 'project_manager' ||
-    userStore.userInfo?.role === 'system_admin'
+    userStore.hasAnyRole('project_manager', 'system_admin')
   )
 }
 
@@ -461,8 +456,7 @@ const canRevertToDraft = (task: Task) => {
   if (task.status !== 'published') return false
   return (
     task.creator_id === userStore.userInfo?.id ||
-    userStore.userInfo?.role === 'project_manager' ||
-    userStore.userInfo?.role === 'system_admin'
+    userStore.hasAnyRole('project_manager', 'system_admin')
   )
 }
 

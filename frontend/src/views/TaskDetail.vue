@@ -481,30 +481,16 @@ const getSkillsList = (skills?: string) => {
 
 const canPublish = computed(() => {
   if (!task.value || !userStore.userInfo) return false
-  // 只有任务的创建者（且是项目经理或系统管理员）才能发布草稿状态的任务
   const isCreator = task.value.creator_id === userStore.userInfo.id
-  const isManager = userStore.userInfo.role === 'project_manager' || userStore.userInfo.role === 'system_admin'
+  const isManager = userStore.hasAnyRole('project_manager', 'system_admin')
   const isDraft = task.value.status === 'draft'
-  
-  // 调试信息（开发环境）
-  if (import.meta.env.DEV) {
-    console.debug('发布按钮显示条件:', {
-      isDraft,
-      isCreator,
-      isManager,
-      creatorId: task.value.creator_id,
-      currentUserId: userStore.userInfo.id,
-      currentUserRole: userStore.userInfo.role,
-    })
-  }
-  
   return isDraft && isCreator && isManager
 })
 
 const canClaim = computed(() => {
   return (
     task.value?.status === 'published' &&
-    userStore.userInfo?.role === 'developer'
+    userStore.hasRole('developer')
   )
 })
 
@@ -512,7 +498,7 @@ const canEvaluate = computed(() => {
   return (
     task.value?.status === 'pending_eval' &&
     task.value?.assignee_id === userStore.userInfo?.id &&
-    userStore.userInfo?.role === 'developer'
+    userStore.hasRole('developer')
   )
 })
 
@@ -520,7 +506,7 @@ const canStart = computed(() => {
   return (
     task.value?.status === 'claimed' &&
     task.value?.assignee_id === userStore.userInfo?.id &&
-    userStore.userInfo?.role === 'developer'
+    userStore.hasRole('developer')
   )
 })
 
@@ -528,14 +514,14 @@ const canSubmit = computed(() => {
   return (
     (task.value?.status === 'claimed' || task.value?.status === 'in_progress') &&
     task.value?.assignee_id === userStore.userInfo?.id &&
-    userStore.userInfo?.role === 'developer'
+    userStore.hasRole('developer')
   )
 })
 
 const canConfirm = computed(() => {
   return (
     task.value?.status === 'submitted' &&
-    (userStore.userInfo?.role === 'project_manager' || userStore.userInfo?.role === 'system_admin')
+    userStore.hasAnyRole('project_manager', 'system_admin')
   )
 })
 
@@ -549,8 +535,7 @@ const canReturn = computed(() => {
   return (
     isCurrentUserAssignee.value ||
     task.value.creator_id === userStore.userInfo.id ||
-    userStore.userInfo.role === 'project_manager' ||
-    userStore.userInfo.role === 'system_admin'
+    userStore.hasAnyRole('project_manager', 'system_admin')
   )
 })
 
@@ -558,7 +543,7 @@ const canPin = computed(() => {
   return (
     (task.value?.status === 'claimed' || task.value?.status === 'in_progress') &&
     task.value?.assignee_id === userStore.userInfo?.id &&
-    userStore.userInfo?.role === 'developer'
+    userStore.hasRole('developer')
   )
 })
 
