@@ -19,6 +19,7 @@ from app.schemas.task import (
     TaskEvaluate,
     TaskSubmit,
     TaskConfirm,
+    TaskReject,
     TaskPin,
     CollaboratorAdd,
     CollaboratorUpdate,
@@ -348,6 +349,27 @@ async def confirm_task(
         task_id,
         current_user.id,
         role_codes
+    )
+    return task
+
+
+@router.post("/{task_id}/reject", response_model=TaskResponse)
+async def reject_task(
+    task_id: int,
+    reject_data: TaskReject,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """退回已提交任务到"进行中"状态，并记录退回原因。
+    任务创建者、项目经理或系统管理员可操作。
+    """
+    role_codes = [role.code for role in current_user.roles] if current_user.roles else []
+    task = TaskService.reject_task(
+        db,
+        task_id,
+        current_user.id,
+        role_codes,
+        reject_data.reason
     )
     return task
 

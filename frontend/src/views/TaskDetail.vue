@@ -63,6 +63,13 @@
               确认
             </el-button>
             <el-button
+              v-if="canRejectSubmitted"
+              type="warning"
+              @click="showRejectDialogDetail = true"
+            >
+              退回
+            </el-button>
+            <el-button
               v-if="canPin"
               :type="task?.is_pinned ? 'warning' : 'default'"
               @click="handlePin"
@@ -92,6 +99,11 @@
           <el-descriptions-item label="截止时间" :span="2">
             <span v-if="task.deadline">{{ formatDate(task.deadline) }}</span>
             <span v-else class="text-muted">未设置</span>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="task.rejection_reason" label="退回原因" :span="2">
+            <el-tag type="warning" style="white-space: normal; height: auto; padding: 4px 8px;">
+              {{ task.rejection_reason }}
+            </el-tag>
           </el-descriptions-item>
         </el-descriptions>
 
@@ -317,6 +329,42 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 退回已提交任务对话框 -->
+    <el-dialog
+      v-model="showRejectDialogDetail"
+      title="退回任务"
+      width="520px"
+      @close="rejectReasonDetail = ''"
+    >
+      <p style="color: var(--el-text-color-secondary); margin-bottom: 12px;">
+        退回后任务将回到"进行中"状态，请填写退回原因以便认领人知悉。
+      </p>
+      <div style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <el-tag
+          v-for="preset in rejectPresetsDetail"
+          :key="preset"
+          style="cursor: pointer;"
+          @click="rejectReasonDetail = preset"
+        >
+          {{ preset }}
+        </el-tag>
+      </div>
+      <el-input
+        v-model="rejectReasonDetail"
+        type="textarea"
+        :rows="3"
+        placeholder="请输入退回原因，或点击上方快捷选项"
+        maxlength="500"
+        show-word-limit
+      />
+      <template #footer>
+        <el-button @click="showRejectDialogDetail = false">取消</el-button>
+        <el-button type="warning" :loading="rejectLoadingDetail" @click="handleRejectDetail">
+          确认退回
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -336,6 +384,7 @@ import {
   startTask,
   submitTask,
   confirmTask,
+  rejectTask,
   pinTask,
   getTaskSchedule,
   getCollaborators,
@@ -364,6 +413,12 @@ const submitFormRef = ref<FormInstance>()
 const submitForm = reactive({
   actual_man_days: 0,
 })
+
+// 退回已提交任务
+const showRejectDialogDetail = ref(false)
+const rejectLoadingDetail = ref(false)
+const rejectReasonDetail = ref('')
+const rejectPresetsDetail = ['实际投入人天存在争议', '任务未达到预期']
 
 const submitRules: FormRules = {
   actual_man_days: [{ required: true, message: '请输入实际投入人天', trigger: 'blur' }],
@@ -519,6 +574,15 @@ const canSubmit = computed(() => {
 })
 
 const canConfirm = computed(() => {
+  return (
+    task.value?.status === 'submitted' &&
+    (task.value?.creator_id === userStore.userInfo?.id ||
+      userStore.hasAnyRole('project_manager', 'system_admin'))
+  )
+})
+
+// 已提交任务退回权限（与确认相同）
+const canRejectSubmitted = computed(() => {
   return (
     task.value?.status === 'submitted' &&
     (task.value?.creator_id === userStore.userInfo?.id ||
@@ -756,6 +820,26 @@ const handleConfirm = async () => {
     if (error !== 'cancel') {
       ElMessage.error(error.response?.data?.detail || '确认任务失败')
     }
+  }
+}
+
+const handleRejectDetail = async () => {
+  if (!task.value) return
+  if (!rejectReasonDetail.value.trim()) {
+    ElMessage.warning('请填写退回原因')
+    return
+  }
+  rejectLoadingDetail.value = true
+  try {
+    await rejectTask(task.value.id, rejectReasonDetail.value.trim())
+    ElMessage.success('任务已退回，认领人可重新修改后提交')
+    showRejectDialogDetail.value = false
+    rejectReasonDetail.value = ''
+    loadTask()
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '退回任务失败')
+  } finally {
+    rejectLoadingDetail.value = false
   }
 }
 

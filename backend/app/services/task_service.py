@@ -571,6 +571,47 @@ class TaskService:
         return task
 
     @staticmethod
+    def reject_task(
+        db: Session,
+        task_id: int,
+        current_user_id: int,
+        current_user_role_codes: list,
+        reason: str
+    ) -> Task:
+        """退回已提交任务，状态回到"进行中"，并记录退回原因。
+        任务创建者、项目经理、系统管理员可操作。
+        """
+        task = TaskService.get_task(db, task_id)
+        if not task:
+            raise NotFoundError("任务", str(task_id))
+
+        # 状态检查：只有已提交状态可以退回
+        if task.status != TaskStatus.SUBMITTED.value:
+            raise ValidationError("只有已提交状态的任务可以退回")
+
+        # 权限检查：任务创建者、项目经理、系统管理员可以退回
+        is_creator = task.creator_id == current_user_id
+        is_manager = any(r in current_user_role_codes for r in ["project_manager", "system_admin"])
+        if not (is_creator or is_manager):
+            raise PermissionDeniedError("只有任务创建者、项目经理或系统管理员可以退回任务")
+
+        old_status = task.status
+        task.status = TaskStatus.IN_PROGRESS.value
+        task.rejection_reason = reason
+
+        db.commit()
+        db.refresh(task)
+
+        # 消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            pass
+
+        return task
+
+    @staticmethod
     def pin_task(
         db: Session,
         task_id: int,

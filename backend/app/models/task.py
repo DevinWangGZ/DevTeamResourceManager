@@ -41,6 +41,7 @@ class Task(Base):
     required_skills = Column(Text)  # 所需技能（JSON格式或逗号分隔）
     deadline = Column(Date)
     is_pinned = Column(Boolean, nullable=False, default=False)  # 是否置顶
+    rejection_reason = Column(Text)  # 退回原因（发起人/PM 退回已提交任务时填写）
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 

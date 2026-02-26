@@ -61,6 +61,11 @@ class TaskConfirm(BaseModel):
     pass
 
 
+class TaskReject(BaseModel):
+    """退回已提交任务请求"""
+    reason: str = Field(..., min_length=1, max_length=500, description="退回原因")
+
+
 class TaskPin(BaseModel):
     """置顶任务请求"""
     is_pinned: bool = Field(..., description="是否置顶")
@@ -80,6 +85,7 @@ class TaskResponse(BaseModel):
     required_skills: Optional[str]
     deadline: Optional[date]
     is_pinned: bool
+    rejection_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

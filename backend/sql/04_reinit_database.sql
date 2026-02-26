@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     required_skills TEXT COMMENT '所需技能（JSON格式或逗号分隔）',
     deadline DATE COMMENT '截止日期',
     is_pinned TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否置顶，用于任务优先级管理',
+    rejection_reason TEXT COMMENT '退回原因，由发起人/PM 退回已提交任务时填写',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_tasks_status (status),
@@ -354,6 +355,25 @@ INSERT IGNORE INTO project_output_values (project_id, task_output_value, allocat
     ((SELECT id FROM projects WHERE name = '项目A' LIMIT 1), 0, 0),
     ((SELECT id FROM projects WHERE name = '项目B' LIMIT 1), 0, 0),
     ((SELECT id FROM projects WHERE name = '项目C' LIMIT 1), 0, 0);
+
+-- ============================================
+-- 增量迁移：为已有 tasks 表补充 rejection_reason 字段
+-- MySQL 5.7 不支持 ADD COLUMN IF NOT EXISTS，使用动态 SQL 兼容处理
+-- ============================================
+SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'tasks'
+      AND COLUMN_NAME  = 'rejection_reason'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    "ALTER TABLE tasks ADD COLUMN rejection_reason TEXT COMMENT '退回原因，由发起人/PM 退回已提交任务时填写' AFTER is_pinned",
+    'SELECT ''rejection_reason 列已存在，跳过'' AS migration_note'
+);
+PREPARE _stmt FROM @sql;
+EXECUTE _stmt;
+DEALLOCATE PREPARE _stmt;
 
 -- ============================================
 -- 完成提示

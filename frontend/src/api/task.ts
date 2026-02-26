@@ -17,6 +17,7 @@ export interface Task {
   required_skills?: string
   deadline?: string
   is_pinned: boolean
+  rejection_reason?: string
   created_at: string
   updated_at: string
 }
@@ -256,6 +257,13 @@ export function submitTask(taskId: number, data: TaskSubmit): Promise<Task> {
  */
 export function confirmTask(taskId: number): Promise<Task> {
   return request.post(`/api/v1/tasks/${taskId}/confirm`)
+}
+
+/**
+ * 退回已提交任务（发起人/PM），附带退回原因，任务回到"进行中"状态
+ */
+export function rejectTask(taskId: number, reason: string): Promise<Task> {
+  return request.post(`/api/v1/tasks/${taskId}/reject`, { reason })
 }
 
 /**
