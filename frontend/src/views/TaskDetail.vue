@@ -42,6 +42,13 @@
               开始
             </el-button>
             <el-button
+              v-if="canReturn"
+              type="warning"
+              @click="handleReturn"
+            >
+              {{ isCurrentUserAssignee ? '退回任务' : '收回任务' }}
+            </el-button>
+            <el-button
               v-if="canSubmit"
               type="primary"
               @click="showSubmitDialog = true"
@@ -335,6 +342,7 @@ import {
   addCollaborator,
   updateCollaborator,
   removeCollaborator,
+  returnTask,
   type TaskDetail,
   type Collaborator,
 } from '@/api/task'
@@ -528,6 +536,21 @@ const canConfirm = computed(() => {
   return (
     task.value?.status === 'submitted' &&
     (userStore.userInfo?.role === 'project_manager' || userStore.userInfo?.role === 'system_admin')
+  )
+})
+
+const isCurrentUserAssignee = computed(
+  () => task.value?.assignee_id === userStore.userInfo?.id
+)
+
+const canReturn = computed(() => {
+  if (!task.value || !userStore.userInfo) return false
+  if (!['claimed', 'in_progress'].includes(task.value.status)) return false
+  return (
+    isCurrentUserAssignee.value ||
+    task.value.creator_id === userStore.userInfo.id ||
+    userStore.userInfo.role === 'project_manager' ||
+    userStore.userInfo.role === 'system_admin'
   )
 })
 
@@ -746,6 +769,28 @@ const handleConfirm = async () => {
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error(error.response?.data?.detail || '确认任务失败')
+    }
+  }
+}
+
+const handleReturn = async () => {
+  if (!task.value) return
+  const isMe = isCurrentUserAssignee.value
+  const label = isMe ? '退回' : '收回'
+  try {
+    await ElMessageBox.confirm(
+      isMe
+        ? '确定要退回此任务吗？任务将重新回到"已发布"状态，可被其他人认领。'
+        : '确定要收回此任务吗？任务将重新回到"已发布"状态，认领人和排期信息将被清除。',
+      `${label}任务`,
+      { confirmButtonText: `确定${label}`, cancelButtonText: '取消', type: 'warning' }
+    )
+    await returnTask(task.value.id)
+    ElMessage.success(`任务已${label}`)
+    loadTask()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || `${label}失败`)
     }
   }
 }

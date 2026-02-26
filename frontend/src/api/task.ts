@@ -156,6 +156,13 @@ export function publishTask(taskId: number): Promise<Task> {
 }
 
 /**
+ * 认领人退回 / 发起人收回已认领任务，回到"已发布"状态
+ */
+export function returnTask(taskId: number): Promise<Task> {
+  return request.post(`/api/v1/tasks/${taskId}/return`)
+}
+
+/**
  * 将已发布任务退回草稿
  */
 export function revertTaskToDraft(taskId: number): Promise<Task> {

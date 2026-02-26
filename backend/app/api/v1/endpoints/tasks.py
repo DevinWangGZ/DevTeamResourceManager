@@ -229,6 +229,19 @@ async def publish_task(
     return task
 
 
+@router.post("/{task_id}/return", response_model=TaskResponse)
+async def return_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """退回/收回已认领任务到"已发布"状态。
+    认领人可主动退回；任务创建者或项目经理/管理员可强制收回。
+    """
+    task = TaskService.return_task(db, task_id, current_user.id, current_user.role)
+    return task
+
+
 @router.post("/{task_id}/revert-draft", response_model=TaskResponse)
 async def revert_task_to_draft(
     task_id: int,

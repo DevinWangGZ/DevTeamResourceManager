@@ -191,6 +191,15 @@
               认领
             </el-button>
             <el-button
+              v-if="canReturn(row)"
+              link
+              type="warning"
+              size="small"
+              @click="handleReturn(row)"
+            >
+              {{ isAssignee(row) ? '退回' : '收回' }}
+            </el-button>
+            <el-button
               v-if="canEvaluate(row)"
               link
               type="warning"
@@ -297,6 +306,7 @@ import {
   deleteTask,
   publishTask,
   revertTaskToDraft,
+  returnTask,
   type Task,
 } from '@/api/task'
 import { exportTasks } from '@/api/export'
@@ -427,6 +437,19 @@ const canEdit = (task: Task) => {
 const canPublish = (task: Task) => {
   if (task.status !== 'draft') return false
   return (
+    task.creator_id === userStore.userInfo?.id ||
+    userStore.userInfo?.role === 'project_manager' ||
+    userStore.userInfo?.role === 'system_admin'
+  )
+}
+
+const isAssignee = (task: Task) => task.assignee_id === userStore.userInfo?.id
+
+// 认领人可退回；创建者或PM/管理员可收回（已认领或进行中状态）
+const canReturn = (task: Task) => {
+  if (!['claimed', 'in_progress'].includes(task.status)) return false
+  return (
+    isAssignee(task) ||
     task.creator_id === userStore.userInfo?.id ||
     userStore.userInfo?.role === 'project_manager' ||
     userStore.userInfo?.role === 'system_admin'
@@ -636,6 +659,27 @@ const viewTask = (taskId: number) => {
 
 const editTask = (taskId: number) => {
   router.push({ name: 'TaskEdit', params: { id: taskId } })
+}
+
+const handleReturn = async (task: Task) => {
+  const isMe = isAssignee(task)
+  const label = isMe ? '退回' : '收回'
+  try {
+    await ElMessageBox.confirm(
+      isMe
+        ? '确定要退回此任务吗？任务将重新回到"已发布"状态，可被其他人认领。'
+        : `确定要收回任务"${task.title}"吗？任务将重新回到"已发布"状态，认领人和排期信息将被清除。`,
+      `${label}任务`,
+      { confirmButtonText: `确定${label}`, cancelButtonText: '取消', type: 'warning' }
+    )
+    await returnTask(task.id)
+    ElMessage.success(`任务已${label}`)
+    loadTasks()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || `${label}失败`)
+    }
+  }
 }
 
 const handleRevertToDraft = async (taskId: number) => {

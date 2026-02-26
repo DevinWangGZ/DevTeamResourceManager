@@ -224,6 +224,63 @@ class TaskService:
         return task
 
     @staticmethod
+    def return_task(
+        db: Session,
+        task_id: int,
+        current_user_id: int,
+        current_user_role: str
+    ) -> Task:
+        """退回/收回已认领任务，状态回到"已发布"。
+        
+        - 认领人可主动退回（claimed / in_progress 状态均可）
+        - 任务创建者或项目经理/管理员可强制收回
+        退回后清除认领人、排期及配合人信息。
+        """
+        task = TaskService.get_task(db, task_id)
+        if not task:
+            raise NotFoundError("任务", str(task_id))
+
+        # 状态检查
+        allowed_statuses = [TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value]
+        if task.status not in allowed_statuses:
+            raise ValidationError("只有已认领或进行中的任务可以退回/收回")
+
+        # 权限检查：认领人可退回；创建者或 PM/管理员可收回
+        is_assignee = task.assignee_id == current_user_id
+        is_creator = task.creator_id == current_user_id
+        is_manager = current_user_role in ["project_manager", "system_admin"]
+        if not (is_assignee or is_creator or is_manager):
+            raise PermissionDeniedError("只有任务认领人、创建者或项目经理可以退回/收回任务")
+
+        old_assignee_id = task.assignee_id
+        old_status = task.status
+
+        # 清除认领信息，回到已发布
+        task.status = TaskStatus.PUBLISHED.value
+        task.assignee_id = None
+        task.is_pinned = False
+
+        # 删除排期（需要重新认领后重新生成）
+        from app.models.task_schedule import TaskSchedule
+        db.query(TaskSchedule).filter(TaskSchedule.task_id == task_id).delete()
+
+        # 删除配合人记录
+        from app.models.task_collaborator import TaskCollaborator
+        db.query(TaskCollaborator).filter(TaskCollaborator.task_id == task_id).delete()
+
+        db.commit()
+        db.refresh(task)
+
+        # 消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            pass
+
+        return task
+
+    @staticmethod
     def claim_task(
         db: Session,
         task_id: int,
