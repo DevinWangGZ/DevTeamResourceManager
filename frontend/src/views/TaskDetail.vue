@@ -51,7 +51,7 @@
             <el-button
               v-if="canSubmit"
               type="primary"
-              @click="showSubmitDialog = true"
+              @click="openSubmitDialog"
             >
               提交
             </el-button>
@@ -798,6 +798,11 @@ const handleSubmit = async () => {
       }
     }
   })
+}
+
+const openSubmitDialog = () => {
+  submitForm.actual_man_days = task.value?.estimated_man_days || 0
+  showSubmitDialog.value = true
 }
 
 const resetSubmitForm = () => {
