@@ -171,11 +171,24 @@ async def get_task(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    # 权限检查：开发人员只能查看自己相关的任务或已发布的任务
-    if current_user.role == "developer":
-        if task.status != TaskStatus.PUBLISHED.value and \
-           task.assignee_id != current_user.id and \
-           task.creator_id != current_user.id:
+    # 权限检查：管理员/项目经理/组长可查看所有任务；普通开发人员只能查看自己相关的任务
+    # 兼容新字段 role_codes 和旧字段 role
+    user_role_codes = [r.code for r in current_user.roles] if current_user.roles else []
+    privileged_roles = {"project_manager", "development_lead", "system_admin"}
+    has_privileged_role = (
+        current_user.role in privileged_roles or
+        bool(set(user_role_codes) & privileged_roles)
+    )
+    if not has_privileged_role:
+        # 普通开发人员：只能查看已发布任务、自己认领/创建的任务，以及自己作为协助人的任务
+        collaborator_ids = {c.user_id for c in task.collaborators} if task.collaborators else set()
+        is_related = (
+            task.status == TaskStatus.PUBLISHED.value or
+            task.assignee_id == current_user.id or
+            task.creator_id == current_user.id or
+            current_user.id in collaborator_ids
+        )
+        if not is_related:
             raise HTTPException(status_code=403, detail="无权限查看此任务")
 
     # 构建响应
