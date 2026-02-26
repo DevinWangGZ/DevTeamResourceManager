@@ -517,16 +517,18 @@ class TaskService:
         db: Session,
         task_id: int,
         current_user_id: int,
-        current_user_role: str
+        current_user_role_codes: list
     ) -> Task:
-        """确认任务（项目经理确认）"""
+        """确认任务。任务创建者、项目经理或系统管理员均可确认。"""
         task = TaskService.get_task(db, task_id)
         if not task:
             raise NotFoundError("任务", str(task_id))
 
-        # 权限检查：只有项目经理可以确认任务
-        if current_user_role not in ["project_manager", "system_admin"]:
-            raise PermissionDeniedError("只有项目经理可以确认任务")
+        # 权限检查：任务创建者、项目经理、系统管理员可以确认任务
+        is_creator = task.creator_id == current_user_id
+        is_manager = any(r in current_user_role_codes for r in ["project_manager", "system_admin"])
+        if not (is_creator or is_manager):
+            raise PermissionDeniedError("只有任务创建者、项目经理或系统管理员可以确认任务")
 
         # 状态检查：只有已提交状态可以确认
         if task.status != TaskStatus.SUBMITTED.value:

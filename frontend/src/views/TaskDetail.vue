@@ -521,7 +521,8 @@ const canSubmit = computed(() => {
 const canConfirm = computed(() => {
   return (
     task.value?.status === 'submitted' &&
-    userStore.hasAnyRole('project_manager', 'system_admin')
+    (task.value?.creator_id === userStore.userInfo?.id ||
+      userStore.hasAnyRole('project_manager', 'system_admin'))
   )
 })
 

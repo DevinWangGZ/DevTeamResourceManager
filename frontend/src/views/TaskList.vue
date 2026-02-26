@@ -413,7 +413,8 @@ const canSubmit = (task: Task) => {
 const canConfirm = (task: Task) => {
   return (
     task.status === 'submitted' &&
-    userStore.hasAnyRole('project_manager', 'system_admin')
+    (task.creator_id === userStore.userInfo?.id ||
+      userStore.hasAnyRole('project_manager', 'system_admin'))
   )
 }
 

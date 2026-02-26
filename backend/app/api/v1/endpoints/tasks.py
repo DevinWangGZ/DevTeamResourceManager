@@ -339,14 +339,15 @@ async def submit_task(
 async def confirm_task(
     task_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_project_manager)
+    current_user: User = Depends(get_current_user)
 ):
-    """确认任务（项目经理确认）"""
+    """确认任务。任务创建者、项目经理或系统管理员均可确认。"""
+    role_codes = [role.code for role in current_user.roles] if current_user.roles else []
     task = TaskService.confirm_task(
         db,
         task_id,
         current_user.id,
-        current_user.role
+        role_codes
     )
     return task
 
