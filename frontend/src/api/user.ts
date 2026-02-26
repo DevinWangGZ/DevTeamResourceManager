@@ -68,3 +68,10 @@ export function deleteUser(userId: number): Promise<void> {
 export function updateUserByAdmin(userId: number, data: UserUpdate & { is_active?: boolean }): Promise<UserInfo> {
   return request.put(`/api/v1/users/${userId}`, data)
 }
+
+/**
+ * 设置用户角色列表（覆盖式，仅管理员）
+ */
+export function setUserRoles(userId: number, roleCodes: string[]): Promise<UserInfo> {
+  return request.put(`/api/v1/users/${userId}/roles`, { role_codes: roleCodes })
+}
