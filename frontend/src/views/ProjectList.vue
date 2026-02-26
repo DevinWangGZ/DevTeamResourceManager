@@ -202,7 +202,7 @@
 
 <script setup lang="ts">
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -217,9 +217,10 @@ import {
   type ProjectUpdate,
 } from '@/api/project'
 import { getUsers, type UserInfo } from '@/api/user'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const loading = ref(false)
@@ -447,11 +448,7 @@ const handleDelete = async (project: Project) => {
 }
 
 const viewProject = (projectId: number) => {
-  // 可以跳转到项目详情页，暂时先显示项目信息
-  router.push({ name: 'ProjectDetail', params: { id: projectId } }).catch(() => {
-    // 如果路由不存在，显示项目详情对话框
-    showProjectDetail(projectId)
-  })
+  router.push({ name: 'ProjectDetail', params: { id: projectId } })
 }
 
 const viewProjectTasks = (projectId: number) => {
@@ -469,9 +466,9 @@ const canViewTasks = (project: Project) => {
 const showProjectDetail = async (projectId: number) => {
   try {
     const project = await getProject(projectId)
-    ElMessageBox.alert(
+    await ElMessageBox.alert(
       `
-      <div style="text-align: left;">
+      <div style="text-align: left; line-height: 2;">
         <p><strong>项目名称：</strong>${project.name}</p>
         <p><strong>项目描述：</strong>${project.description || '无'}</p>
         <p><strong>预计产值：</strong>${project.estimated_output_value ? formatMoney(project.estimated_output_value) : '未设置'}</p>
@@ -479,12 +476,15 @@ const showProjectDetail = async (projectId: number) => {
       </div>
       `,
       '项目详情',
-      {
-        dangerouslyUseHTMLString: true,
-      }
+      { dangerouslyUseHTMLString: true }
     )
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || '加载项目详情失败')
+  } catch {
+    // 用户点击关闭按钮，不做任何处理
+  } finally {
+    // 关闭弹窗后将 URL 归还至列表页，避免 URL 残留 id
+    if (route.params.id) {
+      router.replace({ name: 'ProjectList' })
+    }
   }
 }
 
@@ -501,6 +501,17 @@ const loadUsers = async () => {
     userLoading.value = false
   }
 }
+
+// 监听路由参数：当 URL 为 /projects/:id 时自动弹出详情对话框
+watch(
+  () => route.params.id,
+  (id) => {
+    if (id) {
+      showProjectDetail(Number(id))
+    }
+  },
+  { immediate: true }
+)
 
 onMounted(() => {
   loadProjects()
