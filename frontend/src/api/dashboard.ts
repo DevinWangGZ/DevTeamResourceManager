@@ -35,11 +35,24 @@ export interface RecentTask {
   updated_at?: string
 }
 
+export interface CollaboratingTask {
+  id: number
+  title: string
+  status: string
+  project_id?: number
+  /** 分配给当前用户的人天数 */
+  allocated_man_days?: number
+  estimated_man_days?: number
+  updated_at?: string
+}
+
 export interface DeveloperDashboard {
   task_summary: TaskSummary
   workload_summary?: WorkloadSummary
   todo_reminders: TodoReminder[]
   recent_tasks: RecentTask[]
+  /** 当前用户作为协助人参与的任务列表 */
+  collaborating_tasks: CollaboratingTask[]
 }
 
 export interface ProjectTaskSummary {

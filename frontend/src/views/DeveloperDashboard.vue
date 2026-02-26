@@ -161,6 +161,65 @@
       </div>
     </el-card>
 
+    <!-- 协助任务 -->
+    <el-card
+      v-if="dashboardData?.collaborating_tasks && dashboardData.collaborating_tasks.length > 0"
+      class="recent-tasks-card"
+      style="margin-top: 20px"
+    >
+      <template #header>
+        <div class="card-header">
+          <el-icon><Connection /></el-icon>
+          <span>我的协助任务</span>
+          <el-tag type="warning" size="small" style="margin-left: 8px">
+            {{ dashboardData.collaborating_tasks.length }} 个
+          </el-tag>
+          <el-button link type="primary" @click="goToTasks" style="margin-left: auto">
+            查看全部
+            <el-icon><ArrowRight /></el-icon>
+          </el-button>
+        </div>
+      </template>
+      <el-table
+        :data="dashboardData.collaborating_tasks"
+        stripe
+        style="width: 100%"
+      >
+        <el-table-column prop="title" label="任务标题" min-width="180" />
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)">
+              {{ getStatusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="分配人天" width="110">
+          <template #default="{ row }">
+            <span class="text-primary" style="font-weight: 600">
+              {{ row.allocated_man_days ?? '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="estimated_man_days" label="任务总人天" width="120">
+          <template #default="{ row }">
+            {{ row.estimated_man_days ?? '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="updated_at" label="更新时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.updated_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="viewTask(row.id)">
+              查看
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <!-- 任务统计图表 -->
     <el-row :gutter="20" style="margin-top: 20px">
       <el-col :span="12">
@@ -261,6 +320,7 @@ import {
   Operation,
   User,
   ShoppingBag,
+  Connection,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadTimeline from '@/components/business/WorkloadTimeline.vue'
@@ -346,6 +406,7 @@ const getReminderType = (type: string) => {
     pending_eval: 'warning',
     submitted: 'info',
     upcoming_deadline: 'danger',
+    collaborating: 'warning',
   }
   return typeMap[type] || 'info'
 }

@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from app.models.task import Task, TaskStatus
+from app.models.task_collaborator import TaskCollaborator
 from app.models.workload_statistic import WorkloadStatistic
 from app.models.project import Project
 from app.models.project_output_value import ProjectOutputValue
@@ -137,11 +138,46 @@ class DashboardService:
                 "updated_at": task.updated_at.isoformat() if task.updated_at else None,
             })
 
+        # 5. 协助人任务：查询用户作为配合人参与的任务
+        collaborating_records = db.query(TaskCollaborator).filter(
+            TaskCollaborator.user_id == user_id
+        ).all()
+
+        collaborating_tasks_data = []
+        active_collaborating_count = 0  # 进行中/已认领的协助任务数
+
+        for record in collaborating_records:
+            task = record.task
+            if not task:
+                continue
+            collaborating_tasks_data.append({
+                "id": task.id,
+                "title": task.title,
+                "status": task.status,
+                "project_id": task.project_id,
+                "allocated_man_days": float(record.allocated_man_days) if record.allocated_man_days else None,
+                "estimated_man_days": float(task.estimated_man_days) if task.estimated_man_days else None,
+                "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+            })
+            # 统计需要处理的协助任务（进行中或已认领）
+            if task.status in (TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value):
+                active_collaborating_count += 1
+
+        # 协助任务待办提醒
+        if active_collaborating_count > 0:
+            todo_reminders.append(TodoReminder(
+                type="collaborating",
+                title="协助任务待处理",
+                count=active_collaborating_count,
+                link="/tasks"
+            ))
+
         return DeveloperDashboardResponse(
             task_summary=task_summary,
             workload_summary=workload_summary,
             todo_reminders=todo_reminders,
-            recent_tasks=recent_tasks_data
+            recent_tasks=recent_tasks_data,
+            collaborating_tasks=collaborating_tasks_data
         )
 
     @staticmethod

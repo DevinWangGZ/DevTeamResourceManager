@@ -36,6 +36,7 @@ class DeveloperDashboardResponse(BaseModel):
     workload_summary: Optional[WorkloadSummary] = Field(None, description="工作量汇总")
     todo_reminders: List[TodoReminder] = Field(default_factory=list, description="待办提醒")
     recent_tasks: List[dict] = Field(default_factory=list, description="最近任务")
+    collaborating_tasks: List[dict] = Field(default_factory=list, description="作为协助人参与的任务列表")
 
 
 class ProjectTaskSummary(BaseModel):
