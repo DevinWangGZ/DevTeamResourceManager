@@ -376,6 +376,23 @@ EXECUTE _stmt;
 DEALLOCATE PREPARE _stmt;
 
 -- ============================================
+-- 增量迁移：系统公告表
+-- ============================================
+CREATE TABLE IF NOT EXISTS announcements (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    title       VARCHAR(200) NOT NULL COMMENT '公告标题',
+    content     TEXT NOT NULL COMMENT '公告内容',
+    priority    VARCHAR(20) NOT NULL DEFAULT 'normal' COMMENT '优先级: normal/important/urgent',
+    is_active   TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    author_id   INT NOT NULL COMMENT '发布人 ID',
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_is_active (is_active),
+    INDEX idx_created_at (created_at),
+    CONSTRAINT fk_announcement_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告';
+
+-- ============================================
 -- 完成提示
 -- ============================================
 SELECT '数据库重新初始化完成！' AS message;

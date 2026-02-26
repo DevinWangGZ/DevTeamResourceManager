@@ -15,6 +15,7 @@ from app.models.article import Article
 from app.models.article_attachment import ArticleAttachment
 from app.models.message import Message, MessageType
 from app.models.task_collaborator import TaskCollaborator
+from app.models.announcement import Announcement, AnnouncementPriority
 
 __all__ = [
     "Base",
@@ -38,4 +39,6 @@ __all__ = [
     "Message",
     "MessageType",
     "TaskCollaborator",
+    "Announcement",
+    "AnnouncementPriority",
 ]
