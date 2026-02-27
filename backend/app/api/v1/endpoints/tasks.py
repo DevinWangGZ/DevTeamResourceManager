@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
+from datetime import date
 
 from app.api.deps import get_db, get_current_user
 from app.core.permissions import get_current_project_manager
@@ -24,6 +25,14 @@ from app.schemas.task import (
     CollaboratorAdd,
     CollaboratorUpdate,
     CollaboratorResponse,
+    SetConcurrentRequest,
+    ConcurrentCheckResponse,
+    ExceededUser,
+    AffectedSchedule,
+    UserScheduleResponse,
+    UserScheduleItem,
+    ProjectScheduleResponse,
+    ProjectScheduleItem,
 )
 from app.services.task_service import TaskService
 from app.services.task_collaborator_service import TaskCollaboratorService
@@ -53,6 +62,7 @@ async def get_tasks(
     assignee_id: Optional[int] = Query(None, description="认领者ID"),
     keyword: Optional[str] = Query(None, description="关键词搜索"),
     required_skills: Optional[str] = Query(None, description="所需技能（逗号分隔）"),
+    priority: Optional[str] = Query(None, description="优先级筛选：P0/P1/P2"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
     db: Session = Depends(get_db),
@@ -66,6 +76,7 @@ async def get_tasks(
         assignee_id=assignee_id,
         keyword=keyword,
         required_skills=required_skills,
+        priority=priority,
         page=page,
         page_size=page_size
     )
@@ -84,6 +95,7 @@ async def get_marketplace_tasks(
     project_id: Optional[int] = Query(None, description="项目ID"),
     keyword: Optional[str] = Query(None, description="关键词搜索"),
     required_skills: Optional[str] = Query(None, description="所需技能（逗号分隔）"),
+    priority: Optional[str] = Query(None, description="优先级筛选：P0/P1/P2"),
     recommend: bool = Query(False, description="是否推荐（基于当前用户技能）"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -100,6 +112,7 @@ async def get_marketplace_tasks(
         project_id=project_id,
         keyword=keyword,
         required_skills=required_skills,
+        priority=priority,
         page=page,
         page_size=page_size
     )
@@ -149,6 +162,8 @@ async def get_marketplace_tasks(
             "required_skills": task.required_skills,
             "deadline": task.deadline.isoformat() if task.deadline else None,
             "created_at": task.created_at.isoformat() if task.created_at else None,
+            "priority": task.priority if hasattr(task, "priority") else "P2",
+            "priority_multiplier": float(task.priority_multiplier) if hasattr(task, "priority_multiplier") and task.priority_multiplier else 1.0,
         }
         tasks_data.append(task_data)
     
@@ -158,6 +173,25 @@ async def get_marketplace_tasks(
         "page": page,
         "page_size": page_size,
     }
+
+
+# ============================================================
+# 个人日程接口（固定路径，必须在 /{task_id} 路由之前注册）
+# ============================================================
+
+@router.get("/me/schedule", response_model=UserScheduleResponse)
+async def get_my_schedule(
+    start_date: Optional[date] = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: Optional[date] = Query(None, description="结束日期 YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取当前用户的完整排期（含认领任务和配合任务）"""
+    schedule_list = ScheduleService.get_user_full_schedule(
+        db, current_user.id, start_date, end_date
+    )
+    items = [UserScheduleItem(**item) for item in schedule_list]
+    return UserScheduleResponse(schedule=items)
 
 
 @router.get("/{task_id}", response_model=TaskDetailResponse)
@@ -466,7 +500,6 @@ async def get_task_schedule(
     if not schedule:
         raise HTTPException(status_code=404, detail="任务排期不存在")
 
-    # 计算工作日数量
     work_days = ScheduleService.get_workdays_count(
         schedule.start_date,
         schedule.end_date,
@@ -483,3 +516,87 @@ async def get_task_schedule(
     )
 
     return response
+
+
+# ============================================================
+# 并发排期接口
+# ============================================================
+
+@router.get("/{task_id}/concurrent-check", response_model=ConcurrentCheckResponse)
+async def check_concurrent(
+    task_id: int,
+    concurrent_with_task_id: int = Query(..., description="基准任务ID"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """并发预检：查询设为并发后的可行性（不执行实际设置）"""
+    from app.core.exceptions import NotFoundError, ValidationError as AppValidationError
+    try:
+        can_set, exceeded_users, affected_schedules = ScheduleService.check_concurrent_feasibility(
+            db, task_id, concurrent_with_task_id
+        )
+    except (NotFoundError, AppValidationError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return ConcurrentCheckResponse(
+        can_set_concurrent=can_set,
+        exceeded_users=[ExceededUser(**u) for u in exceeded_users],
+        affected_schedules=[AffectedSchedule(**s) for s in affected_schedules],
+    )
+
+
+@router.post("/{task_id}/set-concurrent", response_model=TaskScheduleResponse)
+async def set_concurrent(
+    task_id: int,
+    data: SetConcurrentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """将目标任务设置为与基准任务并发执行"""
+    from app.core.exceptions import NotFoundError, ValidationError as AppValidationError
+    try:
+        schedule = ScheduleService.set_concurrent(
+            db, task_id, data.concurrent_with_task_id, current_user.id
+        )
+    except AppValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    work_days = ScheduleService.get_workdays_count(schedule.start_date, schedule.end_date, db)
+    return TaskScheduleResponse(
+        id=schedule.id,
+        task_id=schedule.task_id,
+        start_date=schedule.start_date,
+        end_date=schedule.end_date,
+        is_pinned=schedule.is_pinned,
+        work_days=work_days,
+    )
+
+
+@router.delete("/{task_id}/set-concurrent", response_model=TaskScheduleResponse)
+async def unset_concurrent(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """取消任务的并发状态，重新归入串行队列"""
+    from app.core.exceptions import NotFoundError, ValidationError as AppValidationError
+    try:
+        schedule = ScheduleService.unset_concurrent(db, task_id, current_user.id)
+    except AppValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    work_days = ScheduleService.get_workdays_count(schedule.start_date, schedule.end_date, db)
+    return TaskScheduleResponse(
+        id=schedule.id,
+        task_id=schedule.task_id,
+        start_date=schedule.start_date,
+        end_date=schedule.end_date,
+        is_pinned=schedule.is_pinned,
+        work_days=work_days,
+    )
+
+

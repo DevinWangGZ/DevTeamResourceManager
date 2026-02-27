@@ -392,3 +392,60 @@ async def get_project_progress(
         },
         "monthly_statistics": monthly_stats,
     }
+
+
+@router.get("/{project_id}/schedule", response_model=dict)
+async def get_project_schedule(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取项目所有任务的排期数据（供甘特图使用）"""
+    from app.models.task import Task
+    from app.models.task_schedule import TaskSchedule
+    from sqlalchemy.orm import joinedload
+
+    project = ProjectService.get_project(db, project_id)
+    if not project:
+        raise NotFoundError("项目不存在")
+
+    tasks = (
+        db.query(Task)
+        .options(
+            joinedload(Task.assignee),
+            joinedload(Task.task_schedule),
+        )
+        .filter(Task.project_id == project_id)
+        .order_by(Task.created_at.asc())
+        .all()
+    )
+
+    tasks_data = []
+    for task in tasks:
+        sched = task.task_schedule
+        assignee_name = None
+        if task.assignee:
+            assignee_name = task.assignee.full_name or task.assignee.username
+
+        tasks_data.append({
+            "task_id": task.id,
+            "task_title": task.title,
+            "priority": task.priority if hasattr(task, "priority") else "P2",
+            "priority_multiplier": float(task.priority_multiplier) if hasattr(task, "priority_multiplier") and task.priority_multiplier else 1.0,
+            "assignee_id": task.assignee_id,
+            "assignee_name": assignee_name,
+            "scheduled_start": sched.start_date.isoformat() if sched and sched.start_date else None,
+            "scheduled_end": sched.end_date.isoformat() if sched and sched.end_date else None,
+            "status": task.status,
+            "estimated_man_days": float(task.estimated_man_days) if task.estimated_man_days else 0,
+            "actual_man_days": float(task.actual_man_days) if task.actual_man_days else None,
+            "is_concurrent": sched.is_concurrent if sched else False,
+            "concurrent_with": sched.concurrent_with if sched else None,
+            "deadline": task.deadline.isoformat() if task.deadline else None,
+        })
+
+    return {
+        "project_id": project_id,
+        "project_name": project.name,
+        "tasks": tasks_data,
+    }

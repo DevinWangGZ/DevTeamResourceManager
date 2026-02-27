@@ -87,6 +87,12 @@
           <el-descriptions-item label="状态">
             <el-tag :type="getStatusType(task.status)">{{ getStatusText(task.status) }}</el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="优先级">
+            <PriorityTag :priority="task.priority || 'P2'" />
+            <span v-if="task.priority && task.priority !== 'P2'" style="margin-left: 8px; color: #909399; font-size: 12px;">
+              产值溢价 ×{{ task.priority_multiplier || 1.0 }}
+            </span>
+          </el-descriptions-item>
           <el-descriptions-item label="创建者">{{ task.creator_name || '未知' }}</el-descriptions-item>
           <el-descriptions-item label="认领者">{{ task.assignee_name || '未认领' }}</el-descriptions-item>
           <el-descriptions-item label="项目">{{ task.project_name || '未关联项目' }}</el-descriptions-item>
@@ -137,7 +143,27 @@
         <!-- 排期信息 -->
         <el-card class="schedule-card" shadow="never" v-if="schedule">
           <template #header>
-            <span>排期信息</span>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>排期信息</span>
+              <div>
+                <el-button
+                  v-if="canSetConcurrent"
+                  size="small"
+                  type="primary"
+                  @click="openConcurrentDialog"
+                >
+                  设为并发
+                </el-button>
+                <el-button
+                  v-if="canUnsetConcurrent"
+                  size="small"
+                  type="warning"
+                  @click="handleUnsetConcurrent"
+                >
+                  取消并发
+                </el-button>
+              </div>
+            </div>
           </template>
           <el-descriptions :column="2" border>
             <el-descriptions-item label="预计开始时间">
@@ -149,13 +175,96 @@
             <el-descriptions-item label="预计工作日">
               {{ schedule.work_days }} 天
             </el-descriptions-item>
-            <el-descriptions-item label="置顶状态">
-              <el-tag :type="schedule.is_pinned ? 'warning' : 'info'">
-                {{ schedule.is_pinned ? '已置顶' : '未置顶' }}
+            <el-descriptions-item label="排期模式">
+              <el-tag :type="schedule.is_concurrent ? 'success' : 'info'">
+                {{ schedule.is_concurrent ? '并发' : '串行' }}
               </el-tag>
+              <el-tag v-if="schedule.is_pinned" type="warning" style="margin-left: 6px">已置顶</el-tag>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
+
+        <!-- 设为并发对话框 -->
+        <el-dialog
+          v-model="showConcurrentDialog"
+          title="设置并发任务"
+          width="520px"
+          :close-on-click-modal="false"
+        >
+          <div v-if="concurrentCheckResult">
+            <el-alert
+              v-if="!concurrentCheckResult.can_set_concurrent"
+              type="error"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px"
+            >
+              <template #title>以下人员在任务重叠时间段内的并发任务数将超出上限（3个）</template>
+              <div style="margin-top: 8px">
+                <div
+                  v-for="u in concurrentCheckResult.exceeded_users"
+                  :key="u.user_id"
+                  style="line-height: 1.8"
+                >
+                  · <strong>{{ u.name }}</strong>：当前 {{ u.current_concurrent }} 个并发任务，无法再增加
+                </div>
+                <div style="margin-top: 8px; color: #606266">
+                  请与相关配合人确认排期，或变更配合人后再尝试设置并发。
+                </div>
+              </div>
+            </el-alert>
+
+            <template v-else>
+              <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 16px">
+                <template #title>设置并发任务确认</template>
+                <div style="margin-top: 8px; line-height: 1.8">
+                  <p>您即将将本任务设置为与基准任务并发执行。</p>
+                  <p style="margin-top: 6px; color: #606266">在设置并发前，请确认：</p>
+                  <p>✅ 您已与本任务的所有配合人完成排期协调</p>
+                  <p>✅ 您已了解并发后两个任务的人天投入将同时计算</p>
+                </div>
+              </el-alert>
+              <div v-if="concurrentCheckResult.affected_schedules.length > 0">
+                <p style="color: #606266; margin-bottom: 8px">并发后以下任务排期将前移：</p>
+                <el-table :data="concurrentCheckResult.affected_schedules" size="small">
+                  <el-table-column prop="task_title" label="任务名称" />
+                  <el-table-column prop="old_scheduled_start" label="原开始日期" width="120" />
+                  <el-table-column prop="new_scheduled_start" label="新开始日期" width="120" />
+                </el-table>
+              </div>
+            </template>
+          </div>
+
+          <div style="margin-top: 16px">
+            <p style="margin-bottom: 8px">选择基准任务（与哪个任务并发）：</p>
+            <el-select
+              v-model="concurrentWithTaskId"
+              placeholder="选择基准任务"
+              style="width: 100%"
+              filterable
+              @change="onConcurrentBaseChange"
+            >
+              <el-option
+                v-for="t in concurrentCandidates"
+                :key="t.id"
+                :label="`${t.title} (${t.status})`"
+                :value="t.id"
+              />
+            </el-select>
+          </div>
+
+          <template #footer>
+            <el-button @click="showConcurrentDialog = false">取消</el-button>
+            <el-button
+              type="primary"
+              :disabled="!concurrentCheckResult?.can_set_concurrent || !concurrentWithTaskId"
+              :loading="concurrentSubmitting"
+              @click="handleSetConcurrent"
+            >
+              确认设为并发
+            </el-button>
+          </template>
+        </el-dialog>
 
         <!-- 任务配合人 -->
         <el-card
@@ -371,6 +480,7 @@
 <script setup lang="ts">
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import MarkdownViewer from '@/components/ui/MarkdownViewer.vue'
+import PriorityTag from '@/components/business/PriorityTag.vue'
 import { ref, reactive, computed, onMounted, type FormInstance, type FormRules } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -392,8 +502,13 @@ import {
   updateCollaborator,
   removeCollaborator,
   returnTask,
+  checkConcurrent,
+  setConcurrent,
+  unsetConcurrent,
+  getTasks,
   type TaskDetail,
   type Collaborator,
+  type ConcurrentCheckResponse,
 } from '@/api/task'
 import { getDevelopers } from '@/api/user'
 import type { UserInfo } from '@/api/auth'
@@ -405,6 +520,93 @@ const userStore = useUserStore()
 const loading = ref(false)
 const task = ref<TaskDetail | null>(null)
 const schedule = ref<any>(null)
+
+// ---- 并发排期 ----
+const showConcurrentDialog = ref(false)
+const concurrentWithTaskId = ref<number | null>(null)
+const concurrentCheckResult = ref<ConcurrentCheckResponse | null>(null)
+const concurrentCandidates = ref<any[]>([])
+const concurrentSubmitting = ref(false)
+
+const canSetConcurrent = computed(() => {
+  if (!task.value || !schedule.value) return false
+  if (schedule.value.is_concurrent) return false
+  const userId = userStore.userInfo?.id
+  return (
+    task.value.assignee_id === userId &&
+    ['claimed', 'in_progress'].includes(task.value.status)
+  )
+})
+
+const canUnsetConcurrent = computed(() => {
+  if (!task.value || !schedule.value) return false
+  const userId = userStore.userInfo?.id
+  return (
+    schedule.value.is_concurrent &&
+    task.value.assignee_id === userId &&
+    ['claimed', 'in_progress'].includes(task.value.status)
+  )
+})
+
+const openConcurrentDialog = async () => {
+  concurrentCheckResult.value = null
+  concurrentWithTaskId.value = null
+  // 加载当前用户其他已认领/进行中的任务作为候选基准任务
+  try {
+    const userId = userStore.userInfo?.id
+    const res = await getTasks({ assignee_id: userId, page_size: 50 })
+    concurrentCandidates.value = res.items.filter(
+      (t: any) =>
+        t.id !== task.value?.id &&
+        ['claimed', 'in_progress'].includes(t.status)
+    )
+  } catch {}
+  showConcurrentDialog.value = true
+}
+
+const onConcurrentBaseChange = async (baseTaskId: number) => {
+  if (!task.value || !baseTaskId) return
+  try {
+    concurrentCheckResult.value = await checkConcurrent(task.value.id, baseTaskId)
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.detail || '预检失败')
+  }
+}
+
+const handleSetConcurrent = async () => {
+  if (!task.value || !concurrentWithTaskId.value) return
+  concurrentSubmitting.value = true
+  try {
+    await setConcurrent(task.value.id, {
+      concurrent_with_task_id: concurrentWithTaskId.value,
+    })
+    ElMessage.success('已设置为并发任务')
+    showConcurrentDialog.value = false
+    await loadTask()
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.detail || '设置并发失败')
+  } finally {
+    concurrentSubmitting.value = false
+  }
+}
+
+const handleUnsetConcurrent = async () => {
+  if (!task.value) return
+  try {
+    await ElMessageBox.confirm(
+      '确定取消并发状态？取消后该任务将重新归入串行队列，排期会自动重新计算。',
+      '取消并发',
+      { type: 'warning', confirmButtonText: '确定取消', cancelButtonText: '不取消' }
+    )
+    await unsetConcurrent(task.value.id)
+    ElMessage.success('已取消并发，任务回归串行队列')
+    await loadTask()
+  } catch (err: any) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.response?.data?.detail || '取消并发失败')
+    }
+  }
+}
 
 const showEvaluateDialog = ref(false)
 const showSubmitDialog = ref(false)

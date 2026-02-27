@@ -10,6 +10,9 @@
       </el-button>
     </div>
 
+    <el-tabs v-model="activeTab" class="dashboard-tabs">
+      <el-tab-pane label="工作台概览" name="overview">
+
     <el-row :gutter="20" v-loading="loading">
       <!-- 任务汇总卡片 -->
       <el-col :span="6">
@@ -304,6 +307,15 @@
         </el-button>
       </div>
     </el-card>
+
+      </el-tab-pane>
+
+      <el-tab-pane label="📅 我的日程" name="schedule">
+        <el-card shadow="never" style="margin-top: 0">
+          <PersonalScheduleCalendar />
+        </el-card>
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
@@ -325,12 +337,14 @@ import {
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadTimeline from '@/components/business/WorkloadTimeline.vue'
 import WorkloadChart from '@/components/business/WorkloadChart.vue'
+import PersonalScheduleCalendar from '@/components/business/PersonalScheduleCalendar.vue'
 import { getDeveloperDashboard, type DeveloperDashboard } from '@/api/dashboard'
 import { getWorkloadTrend } from '@/api/workload'
 
 const router = useRouter()
 const loading = ref(false)
 const dashboardData = ref<DeveloperDashboard | null>(null)
+const activeTab = ref('overview')
 
 // 任务状态分布图表数据
 const taskStatusChartData = computed(() => {

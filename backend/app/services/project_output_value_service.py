@@ -39,28 +39,30 @@ class ProjectOutputValueService:
             ).first()
 
             if not user_sequence or not user_sequence.unit_price:
-                # 如果没有序列信息，跳过该任务
                 continue
 
-            # 根据任务状态计算产值
+            # 优先级溢价系数（旧任务没有此字段时默认 1.00）
+            multiplier = getattr(task, "priority_multiplier", None) or Decimal("1.00")
+
+            # 根据任务状态计算产值（公式：人天 × 单价 × 优先级溢价系数）
             if task.status == TaskStatus.CONFIRMED.value:
                 # 已确认任务：使用实际投入人天
                 if task.actual_man_days:
-                    task_value = task.actual_man_days * user_sequence.unit_price
+                    task_value = task.actual_man_days * user_sequence.unit_price * multiplier
                     task_output_value += task_value
                     allocated_output_value += task_value
             elif task.status == TaskStatus.SUBMITTED.value:
-                # 已提交但未确认：使用实际投入人天（如果有），否则使用拟投入人天
+                # 已提交但未确认：优先使用实际投入人天，否则用拟投入人天
                 if task.actual_man_days:
-                    task_value = task.actual_man_days * user_sequence.unit_price
+                    task_value = task.actual_man_days * user_sequence.unit_price * multiplier
                     task_output_value += task_value
                 elif task.estimated_man_days:
-                    task_value = task.estimated_man_days * user_sequence.unit_price
+                    task_value = task.estimated_man_days * user_sequence.unit_price * multiplier
                     task_output_value += task_value
             else:
                 # 其他未完成任务：使用拟投入人天
                 if task.estimated_man_days:
-                    task_value = task.estimated_man_days * user_sequence.unit_price
+                    task_value = task.estimated_man_days * user_sequence.unit_price * multiplier
                     task_output_value += task_value
 
         # 查找或创建项目产值记录

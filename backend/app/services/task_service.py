@@ -5,7 +5,7 @@ from typing import Optional, List, Tuple
 from datetime import date
 from decimal import Decimal
 
-from app.models.task import Task, TaskStatus
+from app.models.task import Task, TaskStatus, TaskPriority, PRIORITY_MULTIPLIER
 from app.models.user import User
 from app.models.project import Project
 from app.core.exceptions import NotFoundError, PermissionDeniedError, ValidationError
@@ -21,6 +21,8 @@ class TaskService:
     @staticmethod
     def create_task(db: Session, task_data: TaskCreate, creator_id: int) -> Task:
         """创建任务（草稿状态）"""
+        priority = task_data.priority if task_data.priority else TaskPriority.P2.value
+        multiplier = PRIORITY_MULTIPLIER.get(priority, Decimal("1.00"))
         task = Task(
             title=task_data.title,
             description=task_data.description,
@@ -29,7 +31,9 @@ class TaskService:
             estimated_man_days=task_data.estimated_man_days,
             required_skills=task_data.required_skills,
             deadline=task_data.deadline,
-            status=TaskStatus.DRAFT.value
+            status=TaskStatus.DRAFT.value,
+            priority=priority,
+            priority_multiplier=multiplier,
         )
         db.add(task)
         db.commit()
@@ -96,13 +100,16 @@ class TaskService:
         if filters.required_skills:
             skills_list = [s.strip() for s in filters.required_skills.split(',') if s.strip()]
             if skills_list:
-                # 使用LIKE查询，匹配任务所需技能字段中包含的技能
                 skill_filters = []
                 for skill in skills_list:
                     skill_pattern = f"%{skill}%"
                     skill_filters.append(Task.required_skills.like(skill_pattern))
                 if skill_filters:
                     query = query.filter(or_(*skill_filters))
+
+        # 优先级筛选
+        if filters.priority:
+            query = query.filter(Task.priority == filters.priority)
 
         # 总数
         total = query.count()
@@ -147,6 +154,16 @@ class TaskService:
             task.required_skills = task_data.required_skills
         if task_data.deadline is not None:
             task.deadline = task_data.deadline
+
+        # 优先级只能在草稿或已发布状态修改（认领后锁定）
+        if task_data.priority is not None:
+            if task.status in [TaskStatus.DRAFT.value, TaskStatus.PUBLISHED.value]:
+                task.priority = task_data.priority
+                task.priority_multiplier = PRIORITY_MULTIPLIER.get(
+                    task_data.priority, Decimal("1.00")
+                )
+            else:
+                raise ValidationError("任务认领后优先级不可修改")
 
         db.commit()
         db.refresh(task)

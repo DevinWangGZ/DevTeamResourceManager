@@ -135,6 +135,11 @@
       <el-table :data="taskList" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="任务标题" min-width="200" />
+        <el-table-column prop="priority" label="优先级" width="110">
+          <template #default="{ row }">
+            <PriorityTag :priority="row.priority || 'P2'" :show-label="false" />
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="120">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
@@ -333,6 +338,7 @@
 
 <script setup lang="ts">
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
+import PriorityTag from '@/components/business/PriorityTag.vue'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, Download } from '@element-plus/icons-vue'

@@ -62,6 +62,35 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
+            <el-form-item label="任务优先级" prop="priority">
+              <el-select v-model="form.priority" style="width: 100%" @change="onPriorityChange">
+                <el-option
+                  v-for="opt in PRIORITY_OPTIONS"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                >
+                  <span :style="{ color: opt.color, fontWeight: 'bold' }">{{ opt.value }}</span>
+                  <span style="margin-left: 8px; color: #606266">{{ opt.label.split(' ')[1] }}</span>
+                </el-option>
+              </el-select>
+              <!-- 优先级溢价提示 -->
+              <el-alert
+                v-if="form.priority && form.priority !== 'P2'"
+                :type="form.priority === 'P0' ? 'error' : 'warning'"
+                :closable="false"
+                show-icon
+                style="margin-top: 6px"
+              >
+                <template #title>
+                  选择 {{ form.priority }} 优先级将使该任务产值上浮
+                  <strong>{{ form.priority === 'P0' ? '20%' : '10%' }}</strong>
+                  {{ form.priority === 'P0' ? '，请谨慎使用' : '' }}
+                </template>
+              </el-alert>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
             <el-form-item label="所需技能" prop="required_skills">
               <el-input
                 v-model="form.required_skills"
@@ -69,6 +98,9 @@
               />
             </el-form-item>
           </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="截止时间" prop="deadline">
               <el-date-picker
@@ -111,7 +143,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import MarkdownEditor from '@/components/business/MarkdownEditor.vue'
-import { createTask, updateTask, getTask, type TaskCreate } from '@/api/task'
+import { createTask, updateTask, getTask, PRIORITY_OPTIONS, type TaskCreate } from '@/api/task'
 import { getProjects, type Project } from '@/api/project'
 
 const router = useRouter()
@@ -132,7 +164,12 @@ const form = reactive<TaskCreate>({
   estimated_man_days: 0,
   required_skills: '',
   deadline: undefined,
+  priority: 'P2',
 })
+
+const onPriorityChange = (_val: string) => {
+  // 优先级变更时实时反馈，Alert 已通过 v-if 绑定
+}
 
 const rules: FormRules = {
   title: [
@@ -183,6 +220,7 @@ const loadTaskDetail = async () => {
       estimated_man_days: task.estimated_man_days || 0,
       required_skills: task.required_skills || '',
       deadline: task.deadline,
+      priority: task.priority || 'P2',
     })
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '加载任务详情失败')

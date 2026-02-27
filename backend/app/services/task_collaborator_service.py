@@ -4,6 +4,7 @@ from typing import List
 from decimal import Decimal
 
 from app.models.task_collaborator import TaskCollaborator
+from app.models.task_schedule import TaskSchedule
 from app.models.task import Task, TaskStatus
 from app.models.user import User
 from app.core.exceptions import NotFoundError, PermissionDeniedError, ValidationError
@@ -64,6 +65,8 @@ class TaskCollaboratorService:
                 user_name=r.user.username if r.user else None,
                 user_full_name=r.user.full_name if r.user else None,
                 allocated_man_days=r.allocated_man_days,
+                scheduled_start=r.scheduled_start,
+                scheduled_end=r.scheduled_end,
                 created_at=r.created_at,
             ))
         return result
@@ -112,10 +115,33 @@ class TaskCollaboratorService:
                 f"已分配：{used}，可用剩余：{remaining}，本次请求：{data.allocated_man_days}"
             )
 
+        # 获取任务排期，校验配合人并发数
+        from app.services.schedule_service import ScheduleService, MAX_CONCURRENT_TASKS
+        task_schedule = db.query(TaskSchedule).filter(
+            TaskSchedule.task_id == task_id
+        ).first()
+
+        if task_schedule and task_schedule.start_date and task_schedule.end_date:
+            concurrent_count = ScheduleService.get_concurrent_count(
+                user_id=data.user_id,
+                start=task_schedule.start_date,
+                end=task_schedule.end_date,
+                db=db,
+            )
+            if concurrent_count >= MAX_CONCURRENT_TASKS:
+                collab_user = db.query(User).filter(User.id == data.user_id).first()
+                name = collab_user.full_name or collab_user.username if collab_user else str(data.user_id)
+                raise ValidationError(
+                    f"{name} 在该任务时间段内并发任务数已达上限（{MAX_CONCURRENT_TASKS}个），"
+                    f"无法作为配合人。请调整任务排期或选择其他配合人。"
+                )
+
         record = TaskCollaborator(
             task_id=task_id,
             user_id=data.user_id,
             allocated_man_days=data.allocated_man_days,
+            scheduled_start=task_schedule.start_date if task_schedule else None,
+            scheduled_end=task_schedule.end_date if task_schedule else None,
         )
         db.add(record)
         db.commit()
@@ -128,6 +154,8 @@ class TaskCollaboratorService:
             user_name=user.username,
             user_full_name=user.full_name,
             allocated_man_days=record.allocated_man_days,
+            scheduled_start=record.scheduled_start,
+            scheduled_end=record.scheduled_end,
             created_at=record.created_at,
         )
 
@@ -176,6 +204,8 @@ class TaskCollaboratorService:
             user_name=user.username if user else None,
             user_full_name=user.full_name if user else None,
             allocated_man_days=record.allocated_man_days,
+            scheduled_start=record.scheduled_start,
+            scheduled_end=record.scheduled_end,
             created_at=record.created_at,
         )
 

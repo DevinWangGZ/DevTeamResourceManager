@@ -2,7 +2,29 @@
  * 任务管理API
  */
 import request from './index'
-import type { AxiosResponse } from 'axios'
+
+// 优先级常量
+export const PRIORITY_OPTIONS = [
+  { value: 'P2', label: 'P2 常规', color: '#909399', multiplier: 1.0 },
+  { value: 'P1', label: 'P1 较紧急', color: '#E6A23C', multiplier: 1.1 },
+  { value: 'P0', label: 'P0 最紧急', color: '#F56C6C', multiplier: 1.2 },
+] as const
+
+export type TaskPriority = 'P0' | 'P1' | 'P2'
+
+export const PRIORITY_MULTIPLIER: Record<TaskPriority, number> = {
+  P0: 1.2,
+  P1: 1.1,
+  P2: 1.0,
+}
+
+export interface TaskScheduleInfo {
+  start_date?: string
+  end_date?: string
+  is_pinned: boolean
+  is_concurrent: boolean
+  concurrent_with?: number
+}
 
 export interface Task {
   id: number
@@ -18,6 +40,9 @@ export interface Task {
   deadline?: string
   is_pinned: boolean
   rejection_reason?: string
+  priority: TaskPriority
+  priority_multiplier: number
+  schedule?: TaskScheduleInfo
   created_at: string
   updated_at: string
 }
@@ -35,6 +60,7 @@ export interface TaskCreate {
   estimated_man_days: number
   required_skills?: string
   deadline?: string
+  priority?: TaskPriority
 }
 
 export interface TaskUpdate {
@@ -44,6 +70,7 @@ export interface TaskUpdate {
   estimated_man_days?: number
   required_skills?: string
   deadline?: string
+  priority?: TaskPriority
 }
 
 export interface TaskListResponse {
@@ -57,6 +84,7 @@ export interface TaskFilterParams {
   creator_id?: number
   assignee_id?: number
   keyword?: string
+  priority?: TaskPriority
   page?: number
   page_size?: number
 }
@@ -75,6 +103,77 @@ export interface TaskSubmit {
 
 export interface TaskPin {
   is_pinned: boolean
+}
+
+// ---- 并发排期相关类型 ----
+
+export interface SetConcurrentRequest {
+  concurrent_with_task_id: number
+}
+
+export interface ExceededUser {
+  user_id: number
+  name: string
+  current_concurrent: number
+  limit: number
+}
+
+export interface AffectedSchedule {
+  task_id: number
+  task_title: string
+  old_scheduled_start?: string
+  new_scheduled_start?: string
+}
+
+export interface ConcurrentCheckResponse {
+  can_set_concurrent: boolean
+  exceeded_users: ExceededUser[]
+  affected_schedules: AffectedSchedule[]
+}
+
+// ---- 个人日程类型 ----
+
+export interface UserScheduleItem {
+  task_id: number
+  task_title: string
+  priority: TaskPriority
+  scheduled_start?: string
+  scheduled_end?: string
+  status: string
+  estimated_days: number
+  is_concurrent: boolean
+  concurrent_with?: number
+  role: 'assignee' | 'collaborator'
+  is_pinned: boolean
+}
+
+export interface UserScheduleResponse {
+  schedule: UserScheduleItem[]
+}
+
+// ---- 项目排期类型 ----
+
+export interface ProjectScheduleTask {
+  task_id: number
+  task_title: string
+  priority: TaskPriority
+  priority_multiplier: number
+  assignee_id?: number
+  assignee_name?: string
+  scheduled_start?: string
+  scheduled_end?: string
+  status: string
+  estimated_man_days: number
+  actual_man_days?: number
+  is_concurrent: boolean
+  concurrent_with?: number
+  deadline?: string
+}
+
+export interface ProjectScheduleResponse {
+  project_id: number
+  project_name: string
+  tasks: ProjectScheduleTask[]
 }
 
 /**
@@ -125,6 +224,8 @@ export interface MarketplaceTask {
   required_skills?: string
   deadline?: string
   created_at?: string
+  priority: TaskPriority
+  priority_multiplier: number
 }
 
 export interface MarketplaceResponse {
@@ -142,6 +243,7 @@ export function getMarketplaceTasks(params?: {
   project_id?: number
   keyword?: string
   required_skills?: string
+  priority?: TaskPriority
   recommend?: boolean
   page?: number
   page_size?: number
@@ -179,6 +281,8 @@ export interface Collaborator {
   user_name?: string
   user_full_name?: string
   allocated_man_days: number
+  scheduled_start?: string
+  scheduled_end?: string
   created_at: string
 }
 
@@ -278,4 +382,52 @@ export function pinTask(taskId: number, data: TaskPin): Promise<Task> {
  */
 export function getTaskSchedule(taskId: number): Promise<any> {
   return request.get(`/api/v1/tasks/${taskId}/schedule`)
+}
+
+// ---- 并发排期接口 ----
+
+/**
+ * 并发预检（不执行实际设置）
+ */
+export function checkConcurrent(
+  taskId: number,
+  concurrentWithTaskId: number
+): Promise<ConcurrentCheckResponse> {
+  return request.get(`/api/v1/tasks/${taskId}/concurrent-check`, {
+    params: { concurrent_with_task_id: concurrentWithTaskId },
+  })
+}
+
+/**
+ * 设置任务为并发
+ */
+export function setConcurrent(
+  taskId: number,
+  data: SetConcurrentRequest
+): Promise<any> {
+  return request.post(`/api/v1/tasks/${taskId}/set-concurrent`, data)
+}
+
+/**
+ * 取消任务并发状态
+ */
+export function unsetConcurrent(taskId: number): Promise<any> {
+  return request.delete(`/api/v1/tasks/${taskId}/set-concurrent`)
+}
+
+/**
+ * 获取当前用户的完整排期
+ */
+export function getMySchedule(params?: {
+  start_date?: string
+  end_date?: string
+}): Promise<UserScheduleResponse> {
+  return request.get('/api/v1/tasks/me/schedule', { params })
+}
+
+/**
+ * 获取项目排期（甘特图数据）
+ */
+export function getProjectSchedule(projectId: number): Promise<ProjectScheduleResponse> {
+  return request.get(`/api/v1/projects/${projectId}/schedule`)
 }

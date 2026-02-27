@@ -1,5 +1,5 @@
 """任务配合人模型"""
-from sqlalchemy import Column, Integer, Numeric, TIMESTAMP, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, Numeric, Date, TIMESTAMP, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from decimal import Decimal
@@ -13,6 +13,7 @@ class TaskCollaborator(Base):
     记录参与同一任务协作的开发人员及其分配的人天数。
     由任务认领人（主负责人）负责添加配合人并分配人天。
     任务确认后，配合人的分配人天自动汇入其工作量统计和业务履历。
+    配合人排期与任务认领人排期保持一致（并发模式）。
     """
     __tablename__ = "task_collaborators"
 
@@ -20,6 +21,9 @@ class TaskCollaborator(Base):
     task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     allocated_man_days = Column(Numeric(10, 2), nullable=False, default=Decimal("0"))  # 分配给该配合人的人天
+    # 排期：与任务认领人的排期保持一致（系统自动同步，不可单独修改）
+    scheduled_start = Column(Date, nullable=True)
+    scheduled_end = Column(Date, nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 

@@ -16,6 +16,9 @@
       </div>
     </div>
 
+    <el-tabs v-model="activeTab" class="progress-tabs" style="margin-top: 8px">
+      <el-tab-pane label="进展数据" name="progress">
+
     <div v-loading="loading" v-if="progressData">
       <!-- 项目概览卡片 -->
       <el-row :gutter="20" style="margin-top: 20px">
@@ -212,20 +215,63 @@
         </el-table>
       </el-card>
     </div>
+
+      </el-tab-pane>
+
+      <el-tab-pane label="📅 项目日程" name="schedule">
+        <div style="margin-top: 8px">
+          <el-card shadow="never">
+            <ProjectGanttChart
+              :tasks="ganttTasks"
+              :loading="ganttLoading"
+              @refresh="loadGanttData"
+            />
+          </el-card>
+        </div>
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadChart from '@/components/business/WorkloadChart.vue'
+import ProjectGanttChart from '@/components/business/ProjectGanttChart.vue'
 import { getProjectProgress, type ProjectProgressResponse } from '@/api/project'
+import { getProjectSchedule, type ProjectScheduleTask } from '@/api/task'
 
 const route = useRoute()
 const router = useRouter()
+
+const activeTab = ref('progress')
+
+// 甘特图数据
+const ganttTasks = ref<ProjectScheduleTask[]>([])
+const ganttLoading = ref(false)
+
+const loadGanttData = async () => {
+  if (!projectId.value) return
+  ganttLoading.value = true
+  try {
+    const res = await getProjectSchedule(Number(projectId.value))
+    ganttTasks.value = res.tasks as ProjectScheduleTask[]
+  } catch (err: any) {
+    ganttTasks.value = []
+  } finally {
+    ganttLoading.value = false
+  }
+}
+
+// 切换到日程 Tab 时自动加载
+watch(activeTab, (val) => {
+  if (val === 'schedule' && ganttTasks.value.length === 0) {
+    loadGanttData()
+  }
+})
 
 const loading = ref(false)
 const projectId = ref<number | null>(null)
