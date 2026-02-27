@@ -172,12 +172,83 @@ class DashboardService:
                 link="/tasks"
             ))
 
+        # 6. 今日任务：当天排期内的活跃任务（认领人 + 协助人）
+        today = date.today()
+        from app.models.task_schedule import TaskSchedule
+
+        # 自己作为认领人的今日任务（有排期且今天在排期内，或无排期但状态为活跃）
+        today_assigned_query = db.query(Task).outerjoin(
+            TaskSchedule, Task.id == TaskSchedule.task_id
+        ).filter(
+            Task.assignee_id == user_id,
+            Task.status.in_([
+                TaskStatus.CLAIMED.value,
+                TaskStatus.IN_PROGRESS.value,
+                TaskStatus.PENDING_EVAL.value,
+            ]),
+            or_(
+                # 有排期：今天在排期范围内
+                and_(
+                    TaskSchedule.start_date != None,
+                    TaskSchedule.start_date <= today,
+                    TaskSchedule.end_date >= today,
+                ),
+                # 无排期：直接列入
+                TaskSchedule.id == None,
+            )
+        ).all()
+
+        # 自己作为协助人的今日任务
+        today_collaborating_query = db.query(Task).join(
+            TaskCollaborator, Task.id == TaskCollaborator.task_id
+        ).outerjoin(
+            TaskSchedule, Task.id == TaskSchedule.task_id
+        ).filter(
+            TaskCollaborator.user_id == user_id,
+            Task.status.in_([
+                TaskStatus.CLAIMED.value,
+                TaskStatus.IN_PROGRESS.value,
+            ]),
+            or_(
+                and_(
+                    TaskSchedule.start_date != None,
+                    TaskSchedule.start_date <= today,
+                    TaskSchedule.end_date >= today,
+                ),
+                TaskSchedule.id == None,
+            )
+        ).all()
+
+        seen_ids: set = set()
+        today_tasks_data = []
+        for task in today_assigned_query + today_collaborating_query:
+            if task.id in seen_ids:
+                continue
+            seen_ids.add(task.id)
+            is_collab = task.id not in {t.id for t in today_assigned_query}
+            schedule = task.task_schedule
+            today_tasks_data.append({
+                "id": task.id,
+                "title": task.title,
+                "status": task.status,
+                "priority": task.priority,
+                "project_id": task.project_id,
+                "estimated_man_days": float(task.estimated_man_days) if task.estimated_man_days else None,
+                "actual_man_days": float(task.actual_man_days) if task.actual_man_days else None,
+                "deadline": task.deadline.isoformat() if task.deadline else None,
+                "start_date": schedule.start_date.isoformat() if schedule and schedule.start_date else None,
+                "end_date": schedule.end_date.isoformat() if schedule and schedule.end_date else None,
+                "is_collaborator": is_collab,
+                "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+            })
+
         return DeveloperDashboardResponse(
             task_summary=task_summary,
             workload_summary=workload_summary,
             todo_reminders=todo_reminders,
             recent_tasks=recent_tasks_data,
-            collaborating_tasks=collaborating_tasks_data
+            collaborating_tasks=collaborating_tasks_data,
+            today_tasks=today_tasks_data,
         )
 
     @staticmethod

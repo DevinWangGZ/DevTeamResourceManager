@@ -37,6 +37,7 @@ class DeveloperDashboardResponse(BaseModel):
     todo_reminders: List[TodoReminder] = Field(default_factory=list, description="待办提醒")
     recent_tasks: List[dict] = Field(default_factory=list, description="最近任务")
     collaborating_tasks: List[dict] = Field(default_factory=list, description="作为协助人参与的任务列表")
+    today_tasks: List[dict] = Field(default_factory=list, description="今日需处理任务（排期含今天的活跃任务）")
 
 
 class ProjectTaskSummary(BaseModel):

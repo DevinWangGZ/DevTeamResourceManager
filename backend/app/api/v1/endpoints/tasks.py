@@ -34,9 +34,11 @@ from app.schemas.task import (
     ProjectScheduleResponse,
     ProjectScheduleItem,
 )
+from app.schemas.task_comment import TaskCommentCreate, TaskCommentUpdate, TaskCommentResponse, TaskCommentListResponse
 from app.services.task_service import TaskService
 from app.services.task_collaborator_service import TaskCollaboratorService
 from app.services.schedule_service import ScheduleService
+from app.services.task_comment_service import TaskCommentService
 from app.models.task import TaskStatus
 from app.schemas.schedule import TaskScheduleResponse
 
@@ -598,5 +600,74 @@ async def unset_concurrent(
         is_pinned=schedule.is_pinned,
         work_days=work_days,
     )
+
+
+# ── 任务留言 ─────────────────────────────────────────────────────────────────
+
+@router.get("/{task_id}/comments", response_model=TaskCommentListResponse)
+async def get_task_comments(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取任务留言列表（任务参与者可查看）"""
+    from app.core.exceptions import NotFoundError, PermissionDeniedError
+    try:
+        comments = TaskCommentService.get_comments(db, task_id, current_user.id)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionDeniedError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return TaskCommentListResponse(total=len(comments), items=comments)
+
+
+@router.post("/{task_id}/comments", response_model=TaskCommentResponse, status_code=201)
+async def create_task_comment(
+    task_id: int,
+    data: TaskCommentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """发表任务留言（任务参与者可留言）"""
+    from app.core.exceptions import NotFoundError, PermissionDeniedError
+    try:
+        return TaskCommentService.create_comment(db, task_id, current_user.id, data)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionDeniedError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.put("/comments/{comment_id}", response_model=TaskCommentResponse)
+async def update_task_comment(
+    comment_id: int,
+    data: TaskCommentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """编辑留言（仅留言本人可操作）"""
+    from app.core.exceptions import NotFoundError, PermissionDeniedError
+    try:
+        return TaskCommentService.update_comment(db, comment_id, current_user.id, data)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionDeniedError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.delete("/comments/{comment_id}", status_code=204)
+async def delete_task_comment(
+    comment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """删除留言（仅留言本人可操作）"""
+    from app.core.exceptions import NotFoundError, PermissionDeniedError
+    try:
+        TaskCommentService.delete_comment(db, comment_id, current_user.id)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionDeniedError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 

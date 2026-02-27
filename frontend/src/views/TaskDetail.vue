@@ -328,6 +328,21 @@
             </el-table-column>
           </el-table>
         </el-card>
+
+        <!-- 任务留言 -->
+        <el-card class="comments-card" shadow="never">
+          <template #header>
+            <div class="card-header-row">
+              <el-icon><ChatDotSquare /></el-icon>
+              <span>任务留言</span>
+              <el-tag size="small" type="info" style="margin-left: 6px">
+                {{ commentsCount }}
+              </el-tag>
+            </div>
+          </template>
+          <TaskComments ref="commentsRef" :task-id="task.id" @count-change="commentsCount = $event" />
+        </el-card>
+
       </div>
     </el-card>
 
@@ -481,10 +496,11 @@
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import MarkdownViewer from '@/components/ui/MarkdownViewer.vue'
 import PriorityTag from '@/components/business/PriorityTag.vue'
+import TaskComments from '@/components/business/TaskComments.vue'
 import { ref, reactive, computed, onMounted, type FormInstance, type FormRules } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { StarFilled } from '@element-plus/icons-vue'
+import { StarFilled, ChatDotSquare } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import {
   getTask,
@@ -520,6 +536,10 @@ const userStore = useUserStore()
 const loading = ref(false)
 const task = ref<TaskDetail | null>(null)
 const schedule = ref<any>(null)
+
+// ---- 留言 ----
+const commentsRef = ref<InstanceType<typeof TaskComments> | null>(null)
+const commentsCount = ref(0)
 
 // ---- 并发排期 ----
 const showConcurrentDialog = ref(false)
@@ -1194,5 +1214,16 @@ onMounted(() => {
 
 .text-muted {
   color: #999;
+}
+
+.comments-card {
+  margin-top: 16px;
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
 }
 </style>

@@ -431,3 +431,49 @@ export function getMySchedule(params?: {
 export function getProjectSchedule(projectId: number): Promise<ProjectScheduleResponse> {
   return request.get(`/api/v1/projects/${projectId}/schedule`)
 }
+
+// ── 任务留言 ─────────────────────────────────────────────────────────────────
+
+export interface TaskComment {
+  id: number
+  task_id: number
+  user_id: number
+  user_name: string
+  user_full_name?: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TaskCommentListResponse {
+  total: number
+  items: TaskComment[]
+}
+
+/**
+ * 获取任务留言列表
+ */
+export function getTaskComments(taskId: number): Promise<TaskCommentListResponse> {
+  return request.get(`/api/v1/tasks/${taskId}/comments`)
+}
+
+/**
+ * 发表任务留言
+ */
+export function createTaskComment(taskId: number, content: string): Promise<TaskComment> {
+  return request.post(`/api/v1/tasks/${taskId}/comments`, { content })
+}
+
+/**
+ * 编辑留言
+ */
+export function updateTaskComment(commentId: number, content: string): Promise<TaskComment> {
+  return request.put(`/api/v1/tasks/comments/${commentId}`, { content })
+}
+
+/**
+ * 删除留言
+ */
+export function deleteTaskComment(commentId: number): Promise<void> {
+  return request.delete(`/api/v1/tasks/comments/${commentId}`)
+}

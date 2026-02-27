@@ -110,6 +110,14 @@
       </el-col>
     </el-row>
 
+    <!-- 今日任务卡片 -->
+    <div style="margin-top: 20px">
+      <TodayTasks
+        :tasks="dashboardData?.today_tasks || []"
+        @refresh="refreshData"
+      />
+    </div>
+
     <!-- 最近任务 -->
     <el-card class="recent-tasks-card" style="margin-top: 20px">
       <template #header>
@@ -338,6 +346,7 @@ import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadTimeline from '@/components/business/WorkloadTimeline.vue'
 import WorkloadChart from '@/components/business/WorkloadChart.vue'
 import PersonalScheduleCalendar from '@/components/business/PersonalScheduleCalendar.vue'
+import TodayTasks from '@/components/business/TodayTasks.vue'
 import { getDeveloperDashboard, type DeveloperDashboard } from '@/api/dashboard'
 import { getWorkloadTrend } from '@/api/workload'
 

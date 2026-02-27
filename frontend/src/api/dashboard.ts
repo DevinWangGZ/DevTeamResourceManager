@@ -46,6 +46,22 @@ export interface CollaboratingTask {
   updated_at?: string
 }
 
+export interface TodayTask {
+  id: number
+  title: string
+  status: string
+  priority: string
+  project_id?: number
+  estimated_man_days?: number
+  actual_man_days?: number
+  deadline?: string
+  start_date?: string
+  end_date?: string
+  /** 是否以协助人身份参与 */
+  is_collaborator: boolean
+  updated_at?: string
+}
+
 export interface DeveloperDashboard {
   task_summary: TaskSummary
   workload_summary?: WorkloadSummary
@@ -53,6 +69,8 @@ export interface DeveloperDashboard {
   recent_tasks: RecentTask[]
   /** 当前用户作为协助人参与的任务列表 */
   collaborating_tasks: CollaboratingTask[]
+  /** 今日需处理的任务列表 */
+  today_tasks: TodayTask[]
 }
 
 export interface ProjectTaskSummary {

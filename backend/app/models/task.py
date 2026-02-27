@@ -87,6 +87,12 @@ class Task(Base):
         back_populates="task",
         cascade="all, delete-orphan"
     )
+    comments = relationship(
+        "TaskComment",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="TaskComment.created_at.desc()"
+    )
 
     def __repr__(self):
         return f"<Task(id={self.id}, title={self.title}, status={self.status}, assignee_id={self.assignee_id})>"
