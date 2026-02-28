@@ -164,6 +164,35 @@ class ScheduleService:
             query = query.filter(Task.id != exclude_task_id)
         return query.all()
 
+    # 已完成/终态的任务状态集合（不需要排期）
+    _INACTIVE_STATUSES = [
+        TaskStatus.SUBMITTED.value,
+        TaskStatus.CONFIRMED.value,
+        TaskStatus.ARCHIVED.value,
+    ]
+
+    @staticmethod
+    def _cleanup_inactive_schedules(db: Session, assignee_id: int) -> int:
+        """
+        清理该用户名下已进入终态（已提交/已确认/已归档）任务的排期记录。
+        返回清理的记录数。
+        """
+        inactive_task_ids = (
+            db.query(Task.id)
+            .filter(
+                Task.assignee_id == assignee_id,
+                Task.status.in_(ScheduleService._INACTIVE_STATUSES),
+            )
+            .subquery()
+        )
+        deleted = (
+            db.query(TaskSchedule)
+            .filter(TaskSchedule.task_id.in_(inactive_task_ids))
+            .delete(synchronize_session=False)
+        )
+        db.flush()
+        return deleted
+
     @staticmethod
     def _rebuild_serial_schedules(
         db: Session,
@@ -173,6 +202,7 @@ class ScheduleService:
         """
         重建某开发人员串行队列中所有任务的排期。
         规则：
+        - 重建前先清理已提交/已确认/已归档任务的残留排期记录
         - 若有进行中任务，不中断，从其结束日期之后继续排队
         - P0 任务排在进行中任务之后（不打断当前任务）
         - 其余按优先级+认领时间排序
@@ -180,10 +210,13 @@ class ScheduleService:
         today = date.today()
         start_date = start_from or today
 
+        # 清理已完成任务的残留排期记录，避免其继续占位
+        ScheduleService._cleanup_inactive_schedules(db, assignee_id)
+
         # 获取串行队列
         queue = ScheduleService._get_serial_queue(db, assignee_id)
         if not queue:
-            return
+            return  # 清理已在上方完成，无活跃任务则直接结束
 
         # 找到当前进行中的任务（最多1个），保留其排期不变
         in_progress_task = next(
