@@ -513,12 +513,19 @@ class TaskService:
         if task.status not in [TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value]:
             raise ValidationError("只有已认领或进行中状态的任务可以提交")
 
+        assignee_id = task.assignee_id
         old_status = task.status
         task.status = TaskStatus.SUBMITTED.value
         task.actual_man_days = actual_man_days
         db.commit()
         db.refresh(task)
-        
+
+        # 任务提交后，该任务退出串行队列，自动前移后续任务排期
+        try:
+            ScheduleService.recalculate_user_schedules(db, assignee_id)
+        except Exception:
+            pass
+
         # 创建消息通知
         try:
             from app.services.message_service import MessageService
@@ -612,12 +619,19 @@ class TaskService:
         if not (is_creator or is_manager):
             raise PermissionDeniedError("只有任务创建者、项目经理或系统管理员可以退回任务")
 
+        assignee_id = task.assignee_id
         old_status = task.status
         task.status = TaskStatus.IN_PROGRESS.value
         task.rejection_reason = reason
 
         db.commit()
         db.refresh(task)
+
+        # 任务退回后重新进入串行队列，需重算排期（含后续任务）
+        try:
+            ScheduleService.recalculate_user_schedules(db, assignee_id)
+        except Exception:
+            pass
 
         # 消息通知
         try:
