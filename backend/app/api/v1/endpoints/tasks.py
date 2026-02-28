@@ -196,6 +196,19 @@ async def get_my_schedule(
     return UserScheduleResponse(schedule=items)
 
 
+@router.post("/me/recalculate-schedule")
+async def recalculate_my_schedule(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    手动触发当前用户的排期重算。
+    适用于任务提前完成/提交后，后续任务排期未自动前移的情况。
+    """
+    task_count = ScheduleService.recalculate_user_schedules(db, current_user.id)
+    return {"success": True, "message": f"排期重算完成，共更新 {task_count} 个任务的排期"}
+
+
 @router.get("/{task_id}", response_model=TaskDetailResponse)
 async def get_task(
     task_id: int,

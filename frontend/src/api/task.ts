@@ -426,6 +426,13 @@ export function getMySchedule(params?: {
 }
 
 /**
+ * 手动触发当前用户排期重算（任务提前完成后使用）
+ */
+export function recalculateMySchedule(): Promise<{ success: boolean; message: string }> {
+  return request.post('/api/v1/tasks/me/recalculate-schedule')
+}
+
+/**
  * 获取项目排期（甘特图数据）
  */
 export function getProjectSchedule(projectId: number): Promise<ProjectScheduleResponse> {

@@ -15,6 +15,17 @@
         <span class="period-label">{{ periodLabel }}</span>
       </div>
       <div class="toolbar-right">
+        <el-tooltip content="任务提前完成后，点击此按钮可将后续任务的排期前移" placement="bottom">
+          <el-button
+            size="small"
+            :loading="recalculating"
+            @click="handleRecalculate"
+            style="margin-right: 8px;"
+          >
+            <el-icon v-if="!recalculating"><Refresh /></el-icon>
+            重新计算排期
+          </el-button>
+        </el-tooltip>
         <el-radio-group v-model="viewMode" size="small">
           <el-radio-button label="month">月视图</el-radio-button>
           <el-radio-button label="week">周视图</el-radio-button>
@@ -188,9 +199,9 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Refresh } from '@element-plus/icons-vue'
 import PriorityTag from './PriorityTag.vue'
-import { getMySchedule, type UserScheduleItem } from '@/api/task'
+import { getMySchedule, recalculateMySchedule, type UserScheduleItem } from '@/api/task'
 
 const router = useRouter()
 
@@ -443,6 +454,21 @@ const loadSchedule = async () => {
     ElMessage.error(err.response?.data?.detail || '加载排期失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 重新计算排期
+const recalculating = ref(false)
+const handleRecalculate = async () => {
+  recalculating.value = true
+  try {
+    const res = await recalculateMySchedule()
+    ElMessage.success(res.message || '排期重算完成')
+    await loadSchedule()
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.detail || '排期重算失败，请稍后重试')
+  } finally {
+    recalculating.value = false
   }
 }
 

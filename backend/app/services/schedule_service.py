@@ -313,6 +313,47 @@ class ScheduleService:
         return schedule
 
     # ------------------------------------------------------------------
+    # 用户排期重算（手动触发）
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def recalculate_user_schedules(db: Session, user_id: int) -> int:
+        """
+        重新计算指定用户串行队列中所有任务的排期。
+        适用场景：任务提前完成/提交后，后续任务应前移但系统未自动更新时手动触发。
+        返回本次重算涉及的任务数量。
+        """
+        # 获取串行队列任务数（重算前统计）
+        queue = ScheduleService._get_serial_queue(db, user_id)
+        task_count = len(queue)
+
+        if task_count == 0:
+            return 0
+
+        # 同时也需要同步所有并发任务的配合人排期
+        concurrent_task_ids = (
+            db.query(TaskSchedule.task_id)
+            .join(Task, Task.id == TaskSchedule.task_id)
+            .filter(
+                Task.assignee_id == user_id,
+                TaskSchedule.is_concurrent == True,
+                Task.status.in_([TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value]),
+            )
+            .all()
+        )
+
+        # 重建串行队列排期
+        ScheduleService._rebuild_serial_schedules(db, user_id)
+
+        # 同步所有配合人排期（串行 + 并发任务）
+        all_task_ids = [t.id for t in queue] + [r[0] for r in concurrent_task_ids]
+        for tid in set(all_task_ids):
+            ScheduleService.sync_collaborator_schedules(db, tid)
+
+        db.commit()
+        return task_count
+
+    # ------------------------------------------------------------------
     # 用户排期查询
     # ------------------------------------------------------------------
 
