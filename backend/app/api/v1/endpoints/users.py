@@ -67,7 +67,7 @@ async def update_me(
 @router.get("/", response_model=UserListResponse, summary="获取用户列表")
 async def list_users(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=1000),
     role: str = Query(None, description="按角色筛选"),
     is_active: bool = Query(None, description="按激活状态筛选"),
     current_user: User = Depends(get_current_user),
