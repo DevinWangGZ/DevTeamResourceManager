@@ -31,31 +31,55 @@
           </el-select>
         </el-form-item>
         <el-form-item label="项目">
-          <el-input-number
+          <el-select
             v-model="filterForm.project_id"
-            placeholder="项目ID"
+            placeholder="全部项目"
             clearable
-            style="width: 150px"
-            :min="1"
-          />
+            filterable
+            style="width: 180px"
+            :loading="projectLoading"
+          >
+            <el-option
+              v-for="proj in projectList"
+              :key="proj.id"
+              :label="proj.name"
+              :value="proj.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="创建者">
-          <el-input-number
+          <el-select
             v-model="filterForm.creator_id"
-            placeholder="创建者ID"
+            placeholder="全部创建者"
             clearable
-            style="width: 150px"
-            :min="1"
-          />
+            filterable
+            style="width: 160px"
+            :loading="userLoading"
+          >
+            <el-option
+              v-for="user in userList"
+              :key="user.id"
+              :label="user.full_name ? `${user.full_name}（${user.username}）` : user.username"
+              :value="user.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="认领者">
-          <el-input-number
+          <el-select
             v-model="filterForm.assignee_id"
-            placeholder="认领者ID"
+            placeholder="全部认领者"
             clearable
-            style="width: 150px"
-            :min="1"
-          />
+            filterable
+            style="width: 160px"
+            :loading="userLoading"
+          >
+            <el-option
+              v-for="user in userList"
+              :key="user.id"
+              :label="user.full_name ? `${user.full_name}（${user.username}）` : user.username"
+              :value="user.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="关键词">
           <el-input
@@ -358,6 +382,8 @@ import {
 } from '@/api/task'
 import { exportTasks } from '@/api/export'
 import { getProjects, type Project } from '@/api/project'
+import { getUsers } from '@/api/user'
+import type { UserInfo } from '@/api/auth'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -399,9 +425,14 @@ const currentRejectTask = ref<Task | null>(null)
 const rejectPresets = ['实际投入人天存在争议', '任务未达到预期']
 const rejectForm = reactive({ reason: '' })
 
-// 项目列表
+// 项目列表（用于筛选下拉）
 const projectList = ref<Project[]>([])
 const projectLoading = ref(false)
+
+// 用户列表（用于创建者/认领者筛选下拉）
+const userList = ref<UserInfo[]>([])
+const userLoading = ref(false)
+
 const submitFormRef = ref<FormInstance>()
 const submitForm = reactive({
   actual_man_days: 0,
@@ -622,6 +653,18 @@ const loadProjects = async () => {
     ElMessage.error('加载项目列表失败')
   } finally {
     projectLoading.value = false
+  }
+}
+
+const loadUsers = async () => {
+  userLoading.value = true
+  try {
+    const result = await getUsers({ limit: 1000, is_active: true })
+    userList.value = result.items
+  } catch (error) {
+    ElMessage.error('加载用户列表失败')
+  } finally {
+    userLoading.value = false
   }
 }
 
@@ -869,6 +912,8 @@ const handleDelete = async (task: Task) => {
 
 onMounted(() => {
   loadTasks()
+  loadProjects()
+  loadUsers()
 })
 </script>
 
