@@ -35,9 +35,10 @@ class DeveloperDashboardResponse(BaseModel):
     task_summary: TaskSummary = Field(..., description="任务汇总")
     workload_summary: Optional[WorkloadSummary] = Field(None, description="工作量汇总")
     todo_reminders: List[TodoReminder] = Field(default_factory=list, description="待办提醒")
-    recent_tasks: List[dict] = Field(default_factory=list, description="最近任务")
-    collaborating_tasks: List[dict] = Field(default_factory=list, description="作为协助人参与的任务列表")
+    recent_tasks: List[dict] = Field(default_factory=list, description="最近活跃任务（不含已提交/已确认）")
+    collaborating_tasks: List[dict] = Field(default_factory=list, description="作为协助人参与的活跃任务列表（不含已提交/已确认）")
     today_tasks: List[dict] = Field(default_factory=list, description="今日需处理任务（排期含今天的活跃任务）")
+    completed_tasks: List[dict] = Field(default_factory=list, description="最近已完成任务（已提交/已确认，含认领人和协助人身份）")
 
 
 class ProjectTaskSummary(BaseModel):

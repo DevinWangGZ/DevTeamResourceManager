@@ -121,9 +121,17 @@ class DashboardService:
                 link="/tasks?status=in_progress"
             ))
 
-        # 4. 最近任务（最近5个任务）
+        # 已完成状态：已提交、已确认、已归档
+        COMPLETED_STATUSES = [
+            TaskStatus.SUBMITTED.value,
+            TaskStatus.CONFIRMED.value,
+            TaskStatus.ARCHIVED.value,
+        ]
+
+        # 4. 最近任务（最近5个进行中任务，不含已提交/已确认/已归档）
         recent_tasks = db.query(Task).filter(
-            Task.assignee_id == user_id
+            Task.assignee_id == user_id,
+            Task.status.notin_(COMPLETED_STATUSES)
         ).order_by(Task.updated_at.desc()).limit(5).all()
 
         recent_tasks_data = []
@@ -138,7 +146,7 @@ class DashboardService:
                 "updated_at": task.updated_at.isoformat() if task.updated_at else None,
             })
 
-        # 5. 协助人任务：查询用户作为配合人参与的任务
+        # 5. 协助人任务：查询用户作为配合人参与的活跃任务（不含已提交/已确认/已归档）
         collaborating_records = db.query(TaskCollaborator).filter(
             TaskCollaborator.user_id == user_id
         ).all()
@@ -149,6 +157,9 @@ class DashboardService:
         for record in collaborating_records:
             task = record.task
             if not task:
+                continue
+            # 已完成的协助任务归入 completed_tasks，不在此处展示
+            if task.status in COMPLETED_STATUSES:
                 continue
             collaborating_tasks_data.append({
                 "id": task.id,
@@ -242,6 +253,47 @@ class DashboardService:
                 "updated_at": task.updated_at.isoformat() if task.updated_at else None,
             })
 
+        # 7. 已完成任务（已提交 + 已确认，含认领人和协助人身份，最多10条）
+        completed_assigned = db.query(Task).filter(
+            Task.assignee_id == user_id,
+            Task.status.in_([TaskStatus.SUBMITTED.value, TaskStatus.CONFIRMED.value])
+        ).all()
+
+        # 协助人身份的已完成任务
+        completed_collab_records = db.query(TaskCollaborator).filter(
+            TaskCollaborator.user_id == user_id
+        ).all()
+        completed_collab_task_ids = {t.id for t in completed_assigned}
+        completed_collab_tasks = []
+        for record in completed_collab_records:
+            task = record.task
+            if not task or task.id in completed_collab_task_ids:
+                continue
+            if task.status in [TaskStatus.SUBMITTED.value, TaskStatus.CONFIRMED.value]:
+                completed_collab_tasks.append(task)
+
+        # 合并去重并按更新时间降序排列，最多取10条
+        all_completed = list(completed_assigned) + completed_collab_tasks
+        all_completed.sort(
+            key=lambda t: t.updated_at or datetime.min,
+            reverse=True
+        )
+        all_completed = all_completed[:10]
+
+        assigned_ids = {t.id for t in completed_assigned}
+        completed_tasks_data = []
+        for task in all_completed:
+            completed_tasks_data.append({
+                "id": task.id,
+                "title": task.title,
+                "status": task.status,
+                "project_id": task.project_id,
+                "estimated_man_days": float(task.estimated_man_days) if task.estimated_man_days else None,
+                "actual_man_days": float(task.actual_man_days) if task.actual_man_days else None,
+                "is_collaborator": task.id not in assigned_ids,
+                "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+            })
+
         return DeveloperDashboardResponse(
             task_summary=task_summary,
             workload_summary=workload_summary,
@@ -249,6 +301,7 @@ class DashboardService:
             recent_tasks=recent_tasks_data,
             collaborating_tasks=collaborating_tasks_data,
             today_tasks=today_tasks_data,
+            completed_tasks=completed_tasks_data,
         )
 
     @staticmethod

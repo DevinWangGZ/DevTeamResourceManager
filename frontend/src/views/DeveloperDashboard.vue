@@ -231,6 +231,76 @@
       </el-table>
     </el-card>
 
+    <!-- 最近已完成任务 -->
+    <el-card class="recent-tasks-card" style="margin-top: 20px">
+      <template #header>
+        <div class="card-header">
+          <el-icon style="color: #67c23a"><CircleCheck /></el-icon>
+          <span>最近已完成任务</span>
+          <el-tag
+            v-if="dashboardData?.completed_tasks?.length"
+            type="success"
+            size="small"
+            style="margin-left: 8px"
+          >
+            {{ dashboardData.completed_tasks.length }} 条
+          </el-tag>
+          <el-button link type="primary" @click="goToTasks" style="margin-left: auto">
+            查看全部
+            <el-icon><ArrowRight /></el-icon>
+          </el-button>
+        </div>
+      </template>
+      <el-table
+        :data="dashboardData?.completed_tasks || []"
+        stripe
+        style="width: 100%"
+      >
+        <el-table-column prop="title" label="任务标题" min-width="180" />
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)">
+              {{ getStatusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="角色" width="90">
+          <template #default="{ row }">
+            <el-tag v-if="row.is_collaborator" type="warning" size="small">协助</el-tag>
+            <el-tag v-else type="primary" size="small">认领人</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="estimated_man_days" label="拟投入人天" width="120">
+          <template #default="{ row }">
+            {{ row.estimated_man_days ?? '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="actual_man_days" label="实际投入人天" width="130">
+          <template #default="{ row }">
+            <span v-if="row.actual_man_days" class="text-success" style="font-weight: 600">
+              {{ row.actual_man_days }}
+            </span>
+            <span v-else class="text-info">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="updated_at" label="更新时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.updated_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="viewTask(row.id)">
+              查看
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-if="!dashboardData?.completed_tasks || dashboardData.completed_tasks.length === 0" class="empty-state">
+        <el-empty description="暂无已完成任务" :image-size="100" />
+      </div>
+    </el-card>
+
     <!-- 任务统计图表 -->
     <el-row :gutter="20" style="margin-top: 20px">
       <el-col :span="12">
@@ -341,13 +411,14 @@ import {
   User,
   ShoppingBag,
   Connection,
+  CircleCheck,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import WorkloadTimeline from '@/components/business/WorkloadTimeline.vue'
 import WorkloadChart from '@/components/business/WorkloadChart.vue'
 import PersonalScheduleCalendar from '@/components/business/PersonalScheduleCalendar.vue'
 import TodayTasks from '@/components/business/TodayTasks.vue'
-import { getDeveloperDashboard, type DeveloperDashboard } from '@/api/dashboard'
+import { getDeveloperDashboard, type DeveloperDashboard, type CompletedTask } from '@/api/dashboard'
 import { getWorkloadTrend } from '@/api/workload'
 
 const router = useRouter()
