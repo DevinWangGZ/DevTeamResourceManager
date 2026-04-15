@@ -35,11 +35,57 @@ export interface RecentTask {
   updated_at?: string
 }
 
+export interface CollaboratingTask {
+  id: number
+  title: string
+  status: string
+  project_id?: number
+  /** 分配给当前用户的人天数 */
+  allocated_man_days?: number
+  estimated_man_days?: number
+  updated_at?: string
+}
+
+export interface CompletedTask {
+  id: number
+  title: string
+  status: string
+  project_id?: number
+  estimated_man_days?: number
+  actual_man_days?: number
+  /** 是否以协助人身份参与 */
+  is_collaborator: boolean
+  updated_at?: string
+}
+
+export interface TodayTask {
+  id: number
+  title: string
+  status: string
+  priority: string
+  project_id?: number
+  estimated_man_days?: number
+  actual_man_days?: number
+  deadline?: string
+  start_date?: string
+  end_date?: string
+  /** 是否以协助人身份参与 */
+  is_collaborator: boolean
+  updated_at?: string
+}
+
 export interface DeveloperDashboard {
   task_summary: TaskSummary
   workload_summary?: WorkloadSummary
   todo_reminders: TodoReminder[]
+  /** 最近活跃任务（不含已提交/已确认） */
   recent_tasks: RecentTask[]
+  /** 当前用户作为协助人参与的活跃任务列表（不含已提交/已确认） */
+  collaborating_tasks: CollaboratingTask[]
+  /** 今日需处理的任务列表 */
+  today_tasks: TodayTask[]
+  /** 最近已完成任务（已提交/已确认，含认领人和协助人身份） */
+  completed_tasks: CompletedTask[]
 }
 
 export interface ProjectTaskSummary {

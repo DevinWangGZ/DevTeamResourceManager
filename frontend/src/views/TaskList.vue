@@ -31,31 +31,55 @@
           </el-select>
         </el-form-item>
         <el-form-item label="项目">
-          <el-input-number
+          <el-select
             v-model="filterForm.project_id"
-            placeholder="项目ID"
+            placeholder="全部项目"
             clearable
-            style="width: 150px"
-            :min="1"
-          />
+            filterable
+            style="width: 180px"
+            :loading="projectLoading"
+          >
+            <el-option
+              v-for="proj in projectList"
+              :key="proj.id"
+              :label="proj.name"
+              :value="proj.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="创建者">
-          <el-input-number
+          <el-select
             v-model="filterForm.creator_id"
-            placeholder="创建者ID"
+            placeholder="全部创建者"
             clearable
-            style="width: 150px"
-            :min="1"
-          />
+            filterable
+            style="width: 160px"
+            :loading="userLoading"
+          >
+            <el-option
+              v-for="user in userList"
+              :key="user.id"
+              :label="user.full_name ? `${user.full_name}（${user.username}）` : user.username"
+              :value="user.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="认领者">
-          <el-input-number
+          <el-select
             v-model="filterForm.assignee_id"
-            placeholder="认领者ID"
+            placeholder="全部认领者"
             clearable
-            style="width: 150px"
-            :min="1"
-          />
+            filterable
+            style="width: 160px"
+            :loading="userLoading"
+          >
+            <el-option
+              v-for="user in userList"
+              :key="user.id"
+              :label="user.full_name ? `${user.full_name}（${user.username}）` : user.username"
+              :value="user.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="关键词">
           <el-input
@@ -135,23 +159,9 @@
       <el-table :data="taskList" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="任务标题" min-width="200" />
-        <el-table-column label="优先级" width="120">
+        <el-table-column prop="priority" label="优先级" width="110">
           <template #default="{ row }">
-            <el-select
-              v-if="canEditPriority(row)"
-              :model-value="row.is_pinned"
-              size="small"
-              style="width: 90px"
-              :loading="priorityUpdating[row.id] === true"
-              :disabled="priorityUpdating[row.id] === true || !canUpdatePriorityByStatus(row)"
-              @change="(value: boolean) => handlePriorityChange(row, value)"
-            >
-              <el-option :value="true" label="P0" />
-              <el-option :value="false" label="P2" />
-            </el-select>
-            <el-tag v-else size="small" :type="row.is_pinned ? 'danger' : 'info'">
-              {{ row.is_pinned ? 'P0' : 'P2' }}
-            </el-tag>
+            <PriorityTag :priority="row.priority || 'P2'" :show-label="false" />
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="120">
@@ -168,10 +178,37 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="viewTask(row.id)">
               查看
+            </el-button>
+            <el-button
+              v-if="canEdit(row)"
+              link
+              type="primary"
+              size="small"
+              @click="editTask(row.id)"
+            >
+              编辑
+            </el-button>
+            <el-button
+              v-if="canPublish(row)"
+              link
+              type="success"
+              size="small"
+              @click="handlePublish(row.id)"
+            >
+              发布
+            </el-button>
+            <el-button
+              v-if="canRevertToDraft(row)"
+              link
+              type="warning"
+              size="small"
+              @click="handleRevertToDraft(row.id)"
+            >
+              退回草稿
             </el-button>
             <el-button
               v-if="canClaim(row)"
@@ -183,11 +220,20 @@
               认领
             </el-button>
             <el-button
+              v-if="canReturn(row)"
+              link
+              type="warning"
+              size="small"
+              @click="handleReturn(row)"
+            >
+              {{ isAssignee(row) ? '退回' : '收回' }}
+            </el-button>
+            <el-button
               v-if="canEvaluate(row)"
               link
               type="warning"
               size="small"
-              @click="showEvaluateDialog(row)"
+              @click="showEvaluateDialogFunc(row)"
             >
               评估
             </el-button>
@@ -208,6 +254,15 @@
               @click="handleConfirm(row.id)"
             >
               确认
+            </el-button>
+            <el-button
+              v-if="canRejectSubmitted(row)"
+              link
+              type="warning"
+              size="small"
+              @click="openRejectDialog(row)"
+            >
+              退回
             </el-button>
             <el-button
               v-if="canDelete(row)"
@@ -271,27 +326,64 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 退回已提交任务对话框 -->
+    <el-dialog v-model="showRejectDialog" title="退回任务" width="520px" @close="resetRejectForm">
+      <p style="color: var(--el-text-color-secondary); margin-bottom: 12px;">
+        退回后任务将回到"进行中"状态，请填写退回原因以便认领人知悉。
+      </p>
+      <div style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <el-tag
+          v-for="preset in rejectPresets"
+          :key="preset"
+          style="cursor: pointer;"
+          @click="rejectForm.reason = preset"
+        >
+          {{ preset }}
+        </el-tag>
+      </div>
+      <el-input
+        v-model="rejectForm.reason"
+        type="textarea"
+        :rows="3"
+        placeholder="请输入退回原因，或点击上方快捷选项"
+        maxlength="500"
+        show-word-limit
+      />
+      <template #footer>
+        <el-button @click="showRejectDialog = false">取消</el-button>
+        <el-button type="warning" :loading="rejectLoading" @click="handleReject">
+          确认退回
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
+import PriorityTag from '@/components/business/PriorityTag.vue'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, Download } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import {
   getTasks,
-  updateTask,
   claimTask,
   evaluateTask,
   submitTask,
   confirmTask,
   deleteTask,
+  publishTask,
+  revertTaskToDraft,
+  returnTask,
+  rejectTask,
   type Task,
 } from '@/api/task'
 import { exportTasks } from '@/api/export'
 import { getProjects, type Project } from '@/api/project'
+import { getUsers } from '@/api/user'
+import type { UserInfo } from '@/api/auth'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -325,11 +417,22 @@ const currentEvaluateTask = ref<Task | null>(null)
 const showSubmitDialog = ref(false)
 const currentSubmitTask = ref<Task | null>(null)
 const submitLoading = ref(false)
-const priorityUpdating = reactive<Record<number, boolean>>({})
 
-// 项目列表
+// 退回已提交任务
+const showRejectDialog = ref(false)
+const rejectLoading = ref(false)
+const currentRejectTask = ref<Task | null>(null)
+const rejectPresets = ['实际投入人天存在争议', '任务未达到预期']
+const rejectForm = reactive({ reason: '' })
+
+// 项目列表（用于筛选下拉）
 const projectList = ref<Project[]>([])
 const projectLoading = ref(false)
+
+// 用户列表（用于创建者/认领者筛选下拉）
+const userList = ref<UserInfo[]>([])
+const userLoading = ref(false)
+
 const submitFormRef = ref<FormInstance>()
 const submitForm = reactive({
   actual_man_days: 0,
@@ -373,14 +476,14 @@ const formatDate = (dateStr: string) => {
 }
 
 const canClaim = (task: Task) => {
-  return task.status === 'published' && userStore.userInfo?.role === 'developer'
+  return task.status === 'published' && userStore.hasRole('developer')
 }
 
 const canEvaluate = (task: Task) => {
   return (
     task.status === 'pending_eval' &&
     task.assignee_id === userStore.userInfo?.id &&
-    userStore.userInfo?.role === 'developer'
+    userStore.hasRole('developer')
   )
 }
 
@@ -388,31 +491,68 @@ const canSubmit = (task: Task) => {
   return (
     (task.status === 'claimed' || task.status === 'in_progress') &&
     task.assignee_id === userStore.userInfo?.id &&
-    userStore.userInfo?.role === 'developer'
+    userStore.hasRole('developer')
   )
 }
 
 const canConfirm = (task: Task) => {
   return (
     task.status === 'submitted' &&
-    (userStore.userInfo?.role === 'project_manager' ||
-      userStore.userInfo?.role === 'system_admin')
+    (task.creator_id === userStore.userInfo?.id ||
+      userStore.hasAnyRole('project_manager', 'system_admin'))
+  )
+}
+
+// 已提交任务的退回权限：与确认权限相同（创建者 / PM / 管理员）
+const canRejectSubmitted = (task: Task) => {
+  return (
+    task.status === 'submitted' &&
+    (task.creator_id === userStore.userInfo?.id ||
+      userStore.hasAnyRole('project_manager', 'system_admin'))
   )
 }
 
 const canDelete = (task: Task) => {
-  // 只有创建者可以删除自己创建的任务
   return task.creator_id === userStore.userInfo?.id
 }
 
-const canUpdatePriorityByStatus = (task: Task) => {
-  return !['submitted', 'confirmed', 'archived'].includes(task.status)
+// 草稿状态且是创建者或PM/管理员才可编辑
+const canEdit = (task: Task) => {
+  if (task.status !== 'draft') return false
+  return (
+    task.creator_id === userStore.userInfo?.id ||
+    userStore.hasAnyRole('project_manager', 'system_admin')
+  )
 }
 
-const canEditPriority = (task: Task) => {
-  if (!canUpdatePriorityByStatus(task)) return false
-  if (userStore.userInfo?.role === 'system_admin') return true
-  return task.creator_id === userStore.userInfo?.id
+// 草稿状态且是创建者或PM/管理员才可发布
+const canPublish = (task: Task) => {
+  if (task.status !== 'draft') return false
+  return (
+    task.creator_id === userStore.userInfo?.id ||
+    userStore.hasAnyRole('project_manager', 'system_admin')
+  )
+}
+
+const isAssignee = (task: Task) => task.assignee_id === userStore.userInfo?.id
+
+// 认领人可退回；创建者或PM/管理员可收回（已认领或进行中状态）
+const canReturn = (task: Task) => {
+  if (!['claimed', 'in_progress'].includes(task.status)) return false
+  return (
+    isAssignee(task) ||
+    task.creator_id === userStore.userInfo?.id ||
+    userStore.hasAnyRole('project_manager', 'system_admin')
+  )
+}
+
+// 已发布状态且是创建者或PM/管理员才可退回草稿
+const canRevertToDraft = (task: Task) => {
+  if (task.status !== 'published') return false
+  return (
+    task.creator_id === userStore.userInfo?.id ||
+    userStore.hasAnyRole('project_manager', 'system_admin')
+  )
 }
 
 const loadTasks = async () => {
@@ -516,6 +656,18 @@ const loadProjects = async () => {
   }
 }
 
+const loadUsers = async () => {
+  userLoading.value = true
+  try {
+    const result = await getUsers({ limit: 1000, is_active: true })
+    userList.value = result.items
+  } catch (error) {
+    ElMessage.error('加载用户列表失败')
+  } finally {
+    userLoading.value = false
+  }
+}
+
 const handleClaim = async (taskId: number) => {
   try {
     await ElMessageBox.confirm('确定要认领此任务吗？', '提示', {
@@ -602,8 +754,101 @@ const handleConfirm = async (taskId: number) => {
   }
 }
 
+const openRejectDialog = (task: Task) => {
+  currentRejectTask.value = task
+  rejectForm.reason = ''
+  showRejectDialog.value = true
+}
+
+const resetRejectForm = () => {
+  rejectForm.reason = ''
+  currentRejectTask.value = null
+}
+
+const handleReject = async () => {
+  if (!currentRejectTask.value) return
+  if (!rejectForm.reason.trim()) {
+    ElMessage.warning('请填写退回原因')
+    return
+  }
+  rejectLoading.value = true
+  try {
+    await rejectTask(currentRejectTask.value.id, rejectForm.reason.trim())
+    ElMessage.success('任务已退回，认领人可重新修改后提交')
+    showRejectDialog.value = false
+    loadTasks()
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '退回任务失败')
+  } finally {
+    rejectLoading.value = false
+  }
+}
+
 const viewTask = (taskId: number) => {
   router.push({ name: 'TaskDetail', params: { id: taskId } })
+}
+
+const editTask = (taskId: number) => {
+  router.push({ name: 'TaskEdit', params: { id: taskId } })
+}
+
+const handleReturn = async (task: Task) => {
+  const isMe = isAssignee(task)
+  const label = isMe ? '退回' : '收回'
+  try {
+    await ElMessageBox.confirm(
+      isMe
+        ? '确定要退回此任务吗？任务将重新回到"已发布"状态，可被其他人认领。'
+        : `确定要收回任务"${task.title}"吗？任务将重新回到"已发布"状态，认领人和排期信息将被清除。`,
+      `${label}任务`,
+      { confirmButtonText: `确定${label}`, cancelButtonText: '取消', type: 'warning' }
+    )
+    await returnTask(task.id)
+    ElMessage.success(`任务已${label}`)
+    loadTasks()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || `${label}失败`)
+    }
+  }
+}
+
+const handleRevertToDraft = async (taskId: number) => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要将此任务退回草稿状态吗？退回后任务将从任务集市下架，需重新发布才能认领。',
+      '退回草稿确认',
+      {
+        confirmButtonText: '确定退回',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    await revertTaskToDraft(taskId)
+    ElMessage.success('任务已退回草稿')
+    loadTasks()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '退回草稿失败')
+    }
+  }
+}
+
+const handlePublish = async (taskId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要发布此任务吗？发布后开发者将可以认领该任务。', '发布确认', {
+      confirmButtonText: '确定发布',
+      cancelButtonText: '取消',
+      type: 'info',
+    })
+    await publishTask(taskId)
+    ElMessage.success('任务发布成功')
+    loadTasks()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '发布任务失败')
+    }
+  }
 }
 
 const goToCreate = () => {
@@ -665,26 +910,10 @@ const handleDelete = async (task: Task) => {
   }
 }
 
-const handlePriorityChange = async (task: Task, value: boolean) => {
-  if (!canEditPriority(task) || task.is_pinned === value) return
-
-  priorityUpdating[task.id] = true
-  const oldValue = task.is_pinned
-
-  try {
-    task.is_pinned = value
-    await updateTask(task.id, { is_pinned: value })
-    ElMessage.success('优先级更新成功')
-  } catch (error: any) {
-    task.is_pinned = oldValue
-    ElMessage.error(error.response?.data?.detail || '优先级更新失败')
-  } finally {
-    priorityUpdating[task.id] = false
-  }
-}
-
 onMounted(() => {
   loadTasks()
+  loadProjects()
+  loadUsers()
 })
 </script>
 

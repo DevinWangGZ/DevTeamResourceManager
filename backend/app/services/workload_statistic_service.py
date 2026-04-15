@@ -76,6 +76,55 @@ class WorkloadStatisticService:
             return new_stat
 
     @staticmethod
+    def update_statistic_for_user(
+        db: Session,
+        user_id: int,
+        project_id: Optional[int],
+        man_days: Decimal,
+        ref_date=None,
+    ) -> WorkloadStatistic:
+        """
+        为指定用户累加工作量统计（通用方法）。
+        供配合人工作量汇入等场景复用。
+        """
+        from datetime import date as date_type
+        today = date_type.today()
+        ref = ref_date if ref_date else today
+
+        period_start = date_type(ref.year, ref.month, 1)
+        if ref.month == 12:
+            period_end = date_type(ref.year + 1, 1, 1) - date_type.resolution
+        else:
+            period_end = date_type(ref.year, ref.month + 1, 1) - date_type.resolution
+
+        existing_stat = db.query(WorkloadStatistic).filter(
+            and_(
+                WorkloadStatistic.user_id == user_id,
+                WorkloadStatistic.project_id == project_id,
+                WorkloadStatistic.period_start == period_start,
+                WorkloadStatistic.period_end == period_end,
+            )
+        ).first()
+
+        if existing_stat:
+            existing_stat.total_man_days += man_days
+            db.commit()
+            db.refresh(existing_stat)
+            return existing_stat
+        else:
+            new_stat = WorkloadStatistic(
+                user_id=user_id,
+                project_id=project_id,
+                total_man_days=man_days,
+                period_start=period_start,
+                period_end=period_end,
+            )
+            db.add(new_stat)
+            db.commit()
+            db.refresh(new_stat)
+            return new_stat
+
+    @staticmethod
     def get_statistics(
         db: Session,
         filters: WorkloadStatisticFilterParams

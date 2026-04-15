@@ -27,6 +27,13 @@ export function getUsers(params?: {
 }
 
 /**
+ * 获取所有在职开发人员列表（任何登录用户可调用，用于协作人员选择）
+ */
+export function getDevelopers(): Promise<UserListResponse> {
+  return request.get('/api/v1/users/developers')
+}
+
+/**
  * 更新当前用户信息
  */
 export function updateUser(data: UserUpdate): Promise<UserInfo> {
@@ -60,4 +67,11 @@ export function deleteUser(userId: number): Promise<void> {
  */
 export function updateUserByAdmin(userId: number, data: UserUpdate & { is_active?: boolean }): Promise<UserInfo> {
   return request.put(`/api/v1/users/${userId}`, data)
+}
+
+/**
+ * 设置用户角色列表（覆盖式，仅管理员）
+ */
+export function setUserRoles(userId: number, roleCodes: string[]): Promise<UserInfo> {
+  return request.put(`/api/v1/users/${userId}/roles`, { role_codes: roleCodes })
 }

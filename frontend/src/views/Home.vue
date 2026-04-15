@@ -46,6 +46,9 @@
             </p>
             <p class="description">极简、透明、自助的开发者资源管理与协作平台</p>
           </div>
+          <!-- 公告栏 -->
+          <AnnouncementBoard />
+
           <div class="quick-actions">
             <div 
               class="action-card" 
@@ -150,6 +153,7 @@ import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { User, ArrowDown, List, DataAnalysis, Monitor, FolderOpened, ShoppingBag, Document, UserFilled } from '@element-plus/icons-vue'
 import MessageNotification from '@/components/business/MessageNotification.vue'
+import AnnouncementBoard from '@/components/business/AnnouncementBoard.vue'
 import { onMounted, watch } from 'vue'
 
 const router = useRouter()

@@ -140,8 +140,16 @@ const router = useRouter()
 const route = useRoute()
 
 const formRef = ref<FormInstance>()
+const uploadRef = ref()
 const saving = ref(false)
 const categories = ref<Array<{ name: string; count: number }>>([])
+
+const attachmentList = ref<Array<{
+  name: string
+  size: number
+  raw?: File
+  uploadData?: any
+}>>([])
 
 const isEdit = computed(() => {
   return !!route.params.id

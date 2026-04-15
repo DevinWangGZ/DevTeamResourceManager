@@ -249,7 +249,7 @@ const loadTasks = async () => {
       params.required_skills = filterForm.required_skills.join(',')
     }
 
-    if (showRecommend.value && userStore.userInfo?.role === 'developer') {
+    if (showRecommend.value && userStore.hasRole('developer')) {
       params.recommend = true
     }
 

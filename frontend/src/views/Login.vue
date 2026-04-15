@@ -184,8 +184,7 @@ const handleLogin = async () => {
         if (result.success) {
           ElMessage.success('登录成功')
           // 根据角色跳转到不同页面
-          const role = userStore.userInfo?.role
-          if (role === 'developer') {
+          if (userStore.hasRole('developer')) {
             router.push('/dashboard')
           } else {
             router.push('/')
@@ -219,8 +218,7 @@ const handleRegister = async () => {
           ElMessage.success('注册成功，已自动登录')
           showRegister.value = false
           // 注册成功后根据角色跳转
-          const role = userStore.userInfo?.role
-          if (role === 'developer') {
+          if (userStore.hasRole('developer')) {
             router.push('/dashboard')
           } else {
             router.push('/')

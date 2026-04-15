@@ -5,7 +5,7 @@ from typing import Optional, List, Tuple
 from datetime import date
 from decimal import Decimal
 
-from app.models.task import Task, TaskStatus
+from app.models.task import Task, TaskStatus, TaskPriority, PRIORITY_MULTIPLIER
 from app.models.user import User
 from app.models.project import Project
 from app.core.exceptions import NotFoundError, PermissionDeniedError, ValidationError
@@ -21,6 +21,8 @@ class TaskService:
     @staticmethod
     def create_task(db: Session, task_data: TaskCreate, creator_id: int) -> Task:
         """创建任务（草稿状态）"""
+        priority = task_data.priority if task_data.priority else TaskPriority.P2.value
+        multiplier = PRIORITY_MULTIPLIER.get(priority, Decimal("1.00"))
         task = Task(
             title=task_data.title,
             description=task_data.description,
@@ -29,7 +31,9 @@ class TaskService:
             estimated_man_days=task_data.estimated_man_days,
             required_skills=task_data.required_skills,
             deadline=task_data.deadline,
-            status=TaskStatus.DRAFT.value
+            status=TaskStatus.DRAFT.value,
+            priority=priority,
+            priority_multiplier=multiplier,
         )
         db.add(task)
         db.commit()
@@ -97,13 +101,16 @@ class TaskService:
         if filters.required_skills:
             skills_list = [s.strip() for s in filters.required_skills.split(',') if s.strip()]
             if skills_list:
-                # 使用LIKE查询，匹配任务所需技能字段中包含的技能
                 skill_filters = []
                 for skill in skills_list:
                     skill_pattern = f"%{skill}%"
                     skill_filters.append(Task.required_skills.like(skill_pattern))
                 if skill_filters:
                     query = query.filter(or_(*skill_filters))
+
+        # 优先级筛选
+        if filters.priority:
+            query = query.filter(Task.priority == filters.priority)
 
         # 总数
         total = query.count()
@@ -151,6 +158,16 @@ class TaskService:
         if task_data.is_pinned is not None:
             task.is_pinned = task_data.is_pinned
 
+        # 优先级只能在草稿或已发布状态修改（认领后锁定）
+        if task_data.priority is not None:
+            if task.status in [TaskStatus.DRAFT.value, TaskStatus.PUBLISHED.value]:
+                task.priority = task_data.priority
+                task.priority_multiplier = PRIORITY_MULTIPLIER.get(
+                    task_data.priority, Decimal("1.00")
+                )
+            else:
+                raise ValidationError("任务认领后优先级不可修改")
+
         db.commit()
         db.refresh(task)
         return task
@@ -189,6 +206,98 @@ class TaskService:
             # 消息创建失败不影响任务发布
             pass
         
+        return task
+
+    @staticmethod
+    def revert_to_draft(
+        db: Session,
+        task_id: int,
+        current_user_id: int,
+        current_user_role: str
+    ) -> Task:
+        """将已发布任务退回草稿"""
+        task = TaskService.get_task(db, task_id)
+        if not task:
+            raise NotFoundError("任务", str(task_id))
+
+        # 权限检查：只有创建者或项目经理/管理员可以退回
+        if task.creator_id != current_user_id:
+            if current_user_role not in ["project_manager", "system_admin"]:
+                raise PermissionDeniedError("只有任务创建者或项目经理可以退回任务")
+
+        # 状态检查：只有已发布状态可以退回草稿
+        if task.status != TaskStatus.PUBLISHED.value:
+            raise ValidationError("只有已发布状态的任务可以退回草稿")
+
+        old_status = task.status
+        task.status = TaskStatus.DRAFT.value
+        db.commit()
+        db.refresh(task)
+
+        # 创建消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            pass
+
+        return task
+
+    @staticmethod
+    def return_task(
+        db: Session,
+        task_id: int,
+        current_user_id: int,
+        current_user_role: str
+    ) -> Task:
+        """退回/收回已认领任务，状态回到"已发布"。
+        
+        - 认领人可主动退回（claimed / in_progress 状态均可）
+        - 任务创建者或项目经理/管理员可强制收回
+        退回后清除认领人、排期及配合人信息。
+        """
+        task = TaskService.get_task(db, task_id)
+        if not task:
+            raise NotFoundError("任务", str(task_id))
+
+        # 状态检查
+        allowed_statuses = [TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value]
+        if task.status not in allowed_statuses:
+            raise ValidationError("只有已认领或进行中的任务可以退回/收回")
+
+        # 权限检查：认领人可退回；创建者或 PM/管理员可收回
+        is_assignee = task.assignee_id == current_user_id
+        is_creator = task.creator_id == current_user_id
+        is_manager = current_user_role in ["project_manager", "system_admin"]
+        if not (is_assignee or is_creator or is_manager):
+            raise PermissionDeniedError("只有任务认领人、创建者或项目经理可以退回/收回任务")
+
+        old_assignee_id = task.assignee_id
+        old_status = task.status
+
+        # 清除认领信息，回到已发布
+        task.status = TaskStatus.PUBLISHED.value
+        task.assignee_id = None
+        task.is_pinned = False
+
+        # 删除排期（需要重新认领后重新生成）
+        from app.models.task_schedule import TaskSchedule
+        db.query(TaskSchedule).filter(TaskSchedule.task_id == task_id).delete()
+
+        # 删除配合人记录
+        from app.models.task_collaborator import TaskCollaborator
+        db.query(TaskCollaborator).filter(TaskCollaborator.task_id == task_id).delete()
+
+        db.commit()
+        db.refresh(task)
+
+        # 消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            pass
+
         return task
 
     @staticmethod
@@ -407,12 +516,19 @@ class TaskService:
         if task.status not in [TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value]:
             raise ValidationError("只有已认领或进行中状态的任务可以提交")
 
+        assignee_id = task.assignee_id
         old_status = task.status
         task.status = TaskStatus.SUBMITTED.value
         task.actual_man_days = actual_man_days
         db.commit()
         db.refresh(task)
-        
+
+        # 任务提交后，该任务退出串行队列，自动前移后续任务排期
+        try:
+            ScheduleService.recalculate_user_schedules(db, assignee_id)
+        except Exception:
+            pass
+
         # 创建消息通知
         try:
             from app.services.message_service import MessageService
@@ -428,16 +544,18 @@ class TaskService:
         db: Session,
         task_id: int,
         current_user_id: int,
-        current_user_role: str
+        current_user_role_codes: list
     ) -> Task:
-        """确认任务（项目经理确认）"""
+        """确认任务。任务创建者、项目经理或系统管理员均可确认。"""
         task = TaskService.get_task(db, task_id)
         if not task:
             raise NotFoundError("任务", str(task_id))
 
-        # 权限检查：只有项目经理可以确认任务
-        if current_user_role not in ["project_manager", "system_admin"]:
-            raise PermissionDeniedError("只有项目经理可以确认任务")
+        # 权限检查：任务创建者、项目经理、系统管理员可以确认任务
+        is_creator = task.creator_id == current_user_id
+        is_manager = any(r in current_user_role_codes for r in ["project_manager", "system_admin"])
+        if not (is_creator or is_manager):
+            raise PermissionDeniedError("只有任务创建者、项目经理或系统管理员可以确认任务")
 
         # 状态检查：只有已提交状态可以确认
         if task.status != TaskStatus.SUBMITTED.value:
@@ -457,12 +575,17 @@ class TaskService:
             # 消息创建失败不影响任务确认
             pass
 
-        # 任务确认后，自动更新工作量统计
+        # 任务确认后，自动更新主认领人工作量统计
         try:
             WorkloadStatisticService.update_statistic_on_task_confirmation(db, task)
         except Exception as e:
-            # 如果更新统计失败，记录错误但不影响任务确认
-            # 在实际生产环境中，应该记录日志
+            pass
+
+        # 任务确认后，将配合人的分配人天汇入各自工作量统计
+        try:
+            from app.services.task_collaborator_service import TaskCollaboratorService
+            TaskCollaboratorService.update_collaborators_workload_on_confirmation(db, task)
+        except Exception:
             pass
 
         # 任务确认后，更新项目产值统计
@@ -470,9 +593,55 @@ class TaskService:
             try:
                 ProjectOutputValueService.update_project_output_value(db, task.project_id)
             except Exception as e:
-                # 如果更新项目产值失败，记录错误但不影响任务确认
-                # 在实际生产环境中，应该记录日志
                 pass
+
+        return task
+
+    @staticmethod
+    def reject_task(
+        db: Session,
+        task_id: int,
+        current_user_id: int,
+        current_user_role_codes: list,
+        reason: str
+    ) -> Task:
+        """退回已提交任务，状态回到"进行中"，并记录退回原因。
+        任务创建者、项目经理、系统管理员可操作。
+        """
+        task = TaskService.get_task(db, task_id)
+        if not task:
+            raise NotFoundError("任务", str(task_id))
+
+        # 状态检查：只有已提交状态可以退回
+        if task.status != TaskStatus.SUBMITTED.value:
+            raise ValidationError("只有已提交状态的任务可以退回")
+
+        # 权限检查：任务创建者、项目经理、系统管理员可以退回
+        is_creator = task.creator_id == current_user_id
+        is_manager = any(r in current_user_role_codes for r in ["project_manager", "system_admin"])
+        if not (is_creator or is_manager):
+            raise PermissionDeniedError("只有任务创建者、项目经理或系统管理员可以退回任务")
+
+        assignee_id = task.assignee_id
+        old_status = task.status
+        task.status = TaskStatus.IN_PROGRESS.value
+        task.rejection_reason = reason
+
+        db.commit()
+        db.refresh(task)
+
+        # 任务退回后重新进入串行队列，需重算排期（含后续任务）
+        try:
+            ScheduleService.recalculate_user_schedules(db, assignee_id)
+        except Exception:
+            pass
+
+        # 消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            pass
 
         return task
 

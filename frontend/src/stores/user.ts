@@ -105,6 +105,27 @@ export const useUserStore = defineStore('user', () => {
     return !!token.value
   }
 
+  /**
+   * 检查当前用户是否拥有指定角色。
+   * 同时兼容新字段 role_codes 和旧字段 role，确保过渡期正常工作。
+   */
+  const hasRole = (roleCode: string): boolean => {
+    if (!userInfo.value) return false
+    // 优先检查新字段 role_codes
+    if (userInfo.value.role_codes && userInfo.value.role_codes.length > 0) {
+      return userInfo.value.role_codes.includes(roleCode)
+    }
+    // 兜底兼容旧的 role 字段
+    return userInfo.value.role === roleCode
+  }
+
+  /**
+   * 检查当前用户是否拥有指定角色列表中的任意一个。
+   */
+  const hasAnyRole = (...roleCodes: string[]): boolean => {
+    return roleCodes.some(code => hasRole(code))
+  }
+
   // 如果有token，尝试获取用户信息
   if (token.value) {
     fetchUserInfo()
@@ -120,5 +141,7 @@ export const useUserStore = defineStore('user', () => {
     fetchUserInfo,
     logout,
     isLoggedIn,
+    hasRole,
+    hasAnyRole,
   }
 })

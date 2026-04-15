@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     required_skills TEXT COMMENT '所需技能（JSON格式或逗号分隔）',
     deadline DATE COMMENT '截止日期',
     is_pinned TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否置顶，用于任务优先级管理',
+    rejection_reason TEXT COMMENT '退回原因，由发起人/PM 退回已提交任务时填写',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_tasks_status (status),
@@ -216,6 +217,21 @@ CREATE TABLE IF NOT EXISTS messages (
     CONSTRAINT fk_messages_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_messages_task FOREIGN KEY (related_task_id) REFERENCES tasks(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消息通知表';
+
+-- 13. 任务配合人表 (task_collaborators)
+CREATE TABLE IF NOT EXISTS task_collaborators (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    task_id INT NOT NULL COMMENT '任务ID',
+    user_id INT NOT NULL COMMENT '配合人用户ID',
+    allocated_man_days DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '分配给该配合人的人天数',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uq_task_collaborator (task_id, user_id),
+    INDEX idx_tc_task_id (task_id),
+    INDEX idx_tc_user_id (user_id),
+    CONSTRAINT fk_tc_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    CONSTRAINT fk_tc_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='任务配合人表，记录协作开发人员及其分配人天';
 
 -- ============================================
 -- 步骤4: 创建角色表和用户角色关联表
@@ -339,6 +355,42 @@ INSERT IGNORE INTO project_output_values (project_id, task_output_value, allocat
     ((SELECT id FROM projects WHERE name = '项目A' LIMIT 1), 0, 0),
     ((SELECT id FROM projects WHERE name = '项目B' LIMIT 1), 0, 0),
     ((SELECT id FROM projects WHERE name = '项目C' LIMIT 1), 0, 0);
+
+-- ============================================
+-- 增量迁移：为已有 tasks 表补充 rejection_reason 字段
+-- MySQL 5.7 不支持 ADD COLUMN IF NOT EXISTS，使用动态 SQL 兼容处理
+-- ============================================
+SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'tasks'
+      AND COLUMN_NAME  = 'rejection_reason'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    "ALTER TABLE tasks ADD COLUMN rejection_reason TEXT COMMENT '退回原因，由发起人/PM 退回已提交任务时填写' AFTER is_pinned",
+    'SELECT ''rejection_reason 列已存在，跳过'' AS migration_note'
+);
+PREPARE _stmt FROM @sql;
+EXECUTE _stmt;
+DEALLOCATE PREPARE _stmt;
+
+-- ============================================
+-- 增量迁移：系统公告表
+-- ============================================
+CREATE TABLE IF NOT EXISTS announcements (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    title       VARCHAR(200) NOT NULL COMMENT '公告标题',
+    content     TEXT NOT NULL COMMENT '公告内容',
+    priority    VARCHAR(20) NOT NULL DEFAULT 'normal' COMMENT '优先级: normal/important/urgent',
+    is_active   TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    author_id   INT NOT NULL COMMENT '发布人 ID',
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_is_active (is_active),
+    INDEX idx_created_at (created_at),
+    CONSTRAINT fk_announcement_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告';
 
 -- ============================================
 -- 完成提示

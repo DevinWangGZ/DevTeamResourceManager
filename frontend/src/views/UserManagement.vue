@@ -194,6 +194,30 @@
             show-word-limit
           />
         </el-form-item>
+        <el-form-item label="角色" prop="role_codes">
+          <el-select
+            v-model="editForm.role_codes"
+            multiple
+            placeholder="请选择角色"
+            style="width: 100%"
+          >
+            <el-option label="开发人员" value="developer" />
+            <el-option label="项目经理" value="project_manager" />
+            <el-option label="开发组长" value="development_lead" />
+            <el-option label="系统管理员" value="system_admin" />
+          </el-select>
+          <div class="form-tip">
+            <el-tag
+              v-for="code in editForm.role_codes"
+              :key="code"
+              :type="getRoleTagType(code)"
+              size="small"
+              style="margin-right: 4px; margin-top: 4px"
+            >
+              {{ getRoleName(code) }}
+            </el-tag>
+          </div>
+        </el-form-item>
         <el-form-item label="激活状态" prop="is_active">
           <el-switch v-model="editForm.is_active" />
         </el-form-item>
@@ -219,6 +243,7 @@ import {
   createUser,
   deleteUser,
   updateUserByAdmin,
+  setUserRoles,
   type UserInfo,
   type UserCreateParams,
 } from '@/api/user'
@@ -258,6 +283,7 @@ const editForm = reactive({
   full_name: '',
   status_tag: '',
   is_active: true,
+  role_codes: [] as string[],
 })
 
 const createRules: FormRules = {
@@ -377,6 +403,7 @@ const editUser = (user: UserInfo) => {
   editForm.full_name = user.full_name || ''
   editForm.status_tag = user.status_tag || ''
   editForm.is_active = user.is_active
+  editForm.role_codes = user.role_codes ? [...user.role_codes] : []
   showEditDialog.value = true
 }
 
@@ -387,11 +414,15 @@ const handleUpdate = async () => {
     if (valid) {
       updating.value = true
       try {
-        await updateUserByAdmin(editingUser.value.id, {
-          full_name: editForm.full_name || undefined,
-          status_tag: editForm.status_tag || undefined,
-          is_active: editForm.is_active,
-        })
+        // 并行更新基本信息和角色
+        await Promise.all([
+          updateUserByAdmin(editingUser.value!.id, {
+            full_name: editForm.full_name || undefined,
+            status_tag: editForm.status_tag || undefined,
+            is_active: editForm.is_active,
+          }),
+          setUserRoles(editingUser.value!.id, editForm.role_codes),
+        ])
         ElMessage.success('用户信息更新成功')
         showEditDialog.value = false
         loadUsers()
@@ -412,6 +443,7 @@ const resetEditForm = () => {
   editForm.full_name = ''
   editForm.status_tag = ''
   editForm.is_active = true
+  editForm.role_codes = []
 }
 
 const handleDelete = async (user: UserInfo) => {

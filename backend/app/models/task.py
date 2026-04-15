@@ -20,6 +20,28 @@ class TaskStatus(str, enum.Enum):
     ARCHIVED = "archived"       # 已归档
 
 
+class TaskPriority(str, enum.Enum):
+    """任务优先级枚举"""
+    P0 = "P0"  # 最紧急，产值溢价 20%
+    P1 = "P1"  # 较紧急，产值溢价 10%
+    P2 = "P2"  # 常规，无溢价（默认）
+
+
+# 优先级对应的溢价系数
+PRIORITY_MULTIPLIER = {
+    TaskPriority.P0.value: Decimal("1.20"),
+    TaskPriority.P1.value: Decimal("1.10"),
+    TaskPriority.P2.value: Decimal("1.00"),
+}
+
+# 优先级排序权重（数值越小优先级越高，用于 SQL ORDER BY）
+PRIORITY_ORDER = {
+    TaskPriority.P0.value: 0,
+    TaskPriority.P1.value: 1,
+    TaskPriority.P2.value: 2,
+}
+
+
 class Task(Base):
     """任务模型"""
     __tablename__ = "tasks"
@@ -41,6 +63,10 @@ class Task(Base):
     required_skills = Column(Text)  # 所需技能（JSON格式或逗号分隔）
     deadline = Column(Date)
     is_pinned = Column(Boolean, nullable=False, default=False)  # 是否置顶
+    rejection_reason = Column(Text)  # 退回原因（发起人/PM 退回已提交任务时填写）
+    # 优先级与溢价（P2 为默认，认领后不可更改）
+    priority = Column(String(2), nullable=False, default=TaskPriority.P2.value, index=True)
+    priority_multiplier = Column(Numeric(4, 2), nullable=False, default=Decimal("1.00"))
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -52,9 +78,21 @@ class Task(Base):
         "TaskSchedule",
         back_populates="task",
         uselist=False,
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        foreign_keys="[TaskSchedule.task_id]",
     )
     related_messages = relationship("Message", back_populates="related_task")
+    collaborators = relationship(
+        "TaskCollaborator",
+        back_populates="task",
+        cascade="all, delete-orphan"
+    )
+    comments = relationship(
+        "TaskComment",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="TaskComment.created_at.desc()"
+    )
 
     def __repr__(self):
         return f"<Task(id={self.id}, title={self.title}, status={self.status}, assignee_id={self.assignee_id})>"
