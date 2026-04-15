@@ -135,6 +135,25 @@
       <el-table :data="taskList" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="任务标题" min-width="200" />
+        <el-table-column label="优先级" width="120">
+          <template #default="{ row }">
+            <el-select
+              v-if="canEditPriority(row)"
+              :model-value="row.is_pinned"
+              size="small"
+              style="width: 90px"
+              :loading="priorityUpdating[row.id] === true"
+              :disabled="priorityUpdating[row.id] === true || !canUpdatePriorityByStatus(row)"
+              @change="(value: boolean) => handlePriorityChange(row, value)"
+            >
+              <el-option :value="true" label="P0" />
+              <el-option :value="false" label="P2" />
+            </el-select>
+            <el-tag v-else size="small" :type="row.is_pinned ? 'danger' : 'info'">
+              {{ row.is_pinned ? 'P0' : 'P2' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="120">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
@@ -263,6 +282,7 @@ import { Plus, Search, Download } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import {
   getTasks,
+  updateTask,
   claimTask,
   evaluateTask,
   submitTask,
@@ -305,6 +325,7 @@ const currentEvaluateTask = ref<Task | null>(null)
 const showSubmitDialog = ref(false)
 const currentSubmitTask = ref<Task | null>(null)
 const submitLoading = ref(false)
+const priorityUpdating = reactive<Record<number, boolean>>({})
 
 // 项目列表
 const projectList = ref<Project[]>([])
@@ -381,6 +402,16 @@ const canConfirm = (task: Task) => {
 
 const canDelete = (task: Task) => {
   // 只有创建者可以删除自己创建的任务
+  return task.creator_id === userStore.userInfo?.id
+}
+
+const canUpdatePriorityByStatus = (task: Task) => {
+  return !['submitted', 'confirmed', 'archived'].includes(task.status)
+}
+
+const canEditPriority = (task: Task) => {
+  if (!canUpdatePriorityByStatus(task)) return false
+  if (userStore.userInfo?.role === 'system_admin') return true
   return task.creator_id === userStore.userInfo?.id
 }
 
@@ -631,6 +662,24 @@ const handleDelete = async (task: Task) => {
     if (error !== 'cancel') {
       ElMessage.error(error.response?.data?.detail || '删除任务失败')
     }
+  }
+}
+
+const handlePriorityChange = async (task: Task, value: boolean) => {
+  if (!canEditPriority(task) || task.is_pinned === value) return
+
+  priorityUpdating[task.id] = true
+  const oldValue = task.is_pinned
+
+  try {
+    task.is_pinned = value
+    await updateTask(task.id, { is_pinned: value })
+    ElMessage.success('优先级更新成功')
+  } catch (error: any) {
+    task.is_pinned = oldValue
+    ElMessage.error(error.response?.data?.detail || '优先级更新失败')
+  } finally {
+    priorityUpdating[task.id] = false
   }
 }
 

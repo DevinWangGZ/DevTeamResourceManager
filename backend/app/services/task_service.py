@@ -53,6 +53,7 @@ class TaskService:
         
         query = db.query(Task).options(
             joinedload(Task.creator),
+            joinedload(Task.assignee),
             joinedload(Task.project)
         )
 
@@ -147,6 +148,8 @@ class TaskService:
             task.required_skills = task_data.required_skills
         if task_data.deadline is not None:
             task.deadline = task_data.deadline
+        if task_data.is_pinned is not None:
+            task.is_pinned = task_data.is_pinned
 
         db.commit()
         db.refresh(task)

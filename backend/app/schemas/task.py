@@ -29,6 +29,7 @@ class TaskUpdate(BaseModel):
     estimated_man_days: Optional[Decimal] = Field(None, ge=0, description="拟投入人天")
     required_skills: Optional[str] = Field(None, description="所需技能")
     deadline: Optional[date] = Field(None, description="截止时间")
+    is_pinned: Optional[bool] = Field(None, description="是否置顶（用于优先级）")
 
 
 class TaskPublish(BaseModel):
@@ -94,10 +95,17 @@ class TaskDetailResponse(TaskResponse):
     project_name: Optional[str] = None
 
 
+class TaskListItemResponse(TaskResponse):
+    """任务列表项响应（包含关联信息）"""
+    creator_name: Optional[str] = None
+    assignee_name: Optional[str] = None
+    project_name: Optional[str] = None
+
+
 class TaskListResponse(BaseModel):
     """任务列表响应"""
     total: int
-    items: List[TaskResponse]
+    items: List[TaskListItemResponse]
 
 
 class TaskFilterParams(BaseModel):

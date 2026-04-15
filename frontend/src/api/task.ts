@@ -19,6 +19,9 @@ export interface Task {
   is_pinned: boolean
   created_at: string
   updated_at: string
+  creator_name?: string
+  assignee_name?: string
+  project_name?: string
 }
 
 export interface TaskDetail extends Task {
@@ -43,6 +46,7 @@ export interface TaskUpdate {
   estimated_man_days?: number
   required_skills?: string
   deadline?: string
+  is_pinned?: boolean
 }
 
 export interface TaskListResponse {

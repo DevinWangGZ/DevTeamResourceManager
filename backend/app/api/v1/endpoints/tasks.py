@@ -11,6 +11,7 @@ from app.schemas.task import (
     TaskUpdate,
     TaskResponse,
     TaskDetailResponse,
+    TaskListItemResponse,
     TaskListResponse,
     TaskFilterParams,
     TaskPublish,
@@ -70,7 +71,17 @@ async def get_tasks(
         current_user_id=current_user.id,
         current_user_role=current_user.role
     )
-    return TaskListResponse(total=total, items=tasks)
+    items = []
+    for task in tasks:
+        item = TaskListItemResponse.model_validate(task)
+        if task.creator:
+            item.creator_name = task.creator.full_name or task.creator.username
+        if task.assignee:
+            item.assignee_name = task.assignee.full_name or task.assignee.username
+        if task.project:
+            item.project_name = task.project.name
+        items.append(item)
+    return TaskListResponse(total=total, items=items)
 
 
 @router.get("/marketplace", response_model=dict)
