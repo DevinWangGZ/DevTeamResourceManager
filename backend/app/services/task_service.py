@@ -71,20 +71,28 @@ class TaskService:
                 )
             )
 
-        # 状态筛选
-        if filters.status:
+        # 状态筛选（多选优先）
+        if filters.statuses:
+            query = query.filter(Task.status.in_([s.value for s in filters.statuses]))
+        elif filters.status:
             query = query.filter(Task.status == filters.status.value)
 
-        # 项目筛选
-        if filters.project_id:
+        # 项目筛选（多选优先）
+        if filters.project_ids:
+            query = query.filter(Task.project_id.in_(filters.project_ids))
+        elif filters.project_id:
             query = query.filter(Task.project_id == filters.project_id)
 
-        # 创建者筛选
-        if filters.creator_id:
+        # 创建者筛选（多选优先）
+        if filters.creator_ids:
+            query = query.filter(Task.creator_id.in_(filters.creator_ids))
+        elif filters.creator_id:
             query = query.filter(Task.creator_id == filters.creator_id)
 
-        # 认领者筛选
-        if filters.assignee_id:
+        # 认领者筛选（多选优先）
+        if filters.assignee_ids:
+            query = query.filter(Task.assignee_id.in_(filters.assignee_ids))
+        elif filters.assignee_id:
             query = query.filter(Task.assignee_id == filters.assignee_id)
 
         # 关键词搜索（标题或描述）
@@ -635,6 +643,71 @@ class TaskService:
             ScheduleService.recalculate_user_schedules(db, assignee_id)
         except Exception:
             pass
+
+        # 消息通知
+        try:
+            from app.services.message_service import MessageService
+            MessageService.create_task_status_change_message(db, task, old_status, task.status)
+        except Exception:
+            pass
+
+        return task
+
+    @staticmethod
+    def reopen_task(
+        db: Session,
+        task_id: int,
+        current_user_id: int,
+        current_user_role_codes: list
+    ) -> Task:
+        """重新打开已确认任务，状态回到"进行中"。"""
+        task = TaskService.get_task(db, task_id)
+        if not task:
+            raise NotFoundError("任务", str(task_id))
+
+        # 状态检查：只有已确认状态可以重新打开
+        if task.status != TaskStatus.CONFIRMED.value:
+            raise ValidationError("只有已确认状态的任务可以重新打开")
+
+        # 权限检查：任务创建者、项目经理、系统管理员可以重新打开
+        is_creator = task.creator_id == current_user_id
+        is_manager = any(r in current_user_role_codes for r in ["project_manager", "system_admin"])
+        if not (is_creator or is_manager):
+            raise PermissionDeniedError("只有任务创建者、项目经理或系统管理员可以重新打开任务")
+
+        old_status = task.status
+        task.status = TaskStatus.IN_PROGRESS.value
+
+        # 先提交状态变更，再执行统计回滚
+        db.commit()
+        db.refresh(task)
+
+        # 回滚主认领人的工作量统计（已确认时曾累加）
+        try:
+            if task.assignee_id and task.actual_man_days:
+                WorkloadStatisticService.rollback_statistic_for_user(
+                    db=db,
+                    user_id=task.assignee_id,
+                    project_id=task.project_id,
+                    man_days=task.actual_man_days,
+                    ref_date=task.updated_at.date() if task.updated_at else None,
+                )
+        except Exception:
+            pass
+
+        # 回滚配合人的工作量统计
+        try:
+            from app.services.task_collaborator_service import TaskCollaboratorService
+            TaskCollaboratorService.rollback_collaborators_workload_on_reopen(db, task)
+        except Exception:
+            pass
+
+        # 重新打开后，更新项目产值统计
+        if task.project_id:
+            try:
+                ProjectOutputValueService.update_project_output_value(db, task.project_id)
+            except Exception:
+                pass
 
         # 消息通知
         try:

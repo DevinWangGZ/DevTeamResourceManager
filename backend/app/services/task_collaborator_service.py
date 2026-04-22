@@ -264,3 +264,28 @@ class TaskCollaboratorService:
                 except Exception:
                     # 配合人统计失败不影响任务确认主流程
                     pass
+
+    @staticmethod
+    def rollback_collaborators_workload_on_reopen(db: Session, task: Task) -> None:
+        """
+        任务从已确认重新打开时，回滚配合人工作量统计。
+        """
+        from app.services.workload_statistic_service import WorkloadStatisticService
+
+        collaborators = db.query(TaskCollaborator).filter(
+            TaskCollaborator.task_id == task.id
+        ).all()
+
+        for collab in collaborators:
+            if collab.allocated_man_days and collab.allocated_man_days > 0:
+                try:
+                    WorkloadStatisticService.rollback_statistic_for_user(
+                        db=db,
+                        user_id=collab.user_id,
+                        project_id=task.project_id,
+                        man_days=collab.allocated_man_days,
+                        ref_date=task.updated_at.date() if task.updated_at else None,
+                    )
+                except Exception:
+                    # 回滚失败不影响任务主流程
+                    pass

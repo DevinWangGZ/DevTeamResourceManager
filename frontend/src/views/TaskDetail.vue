@@ -70,6 +70,13 @@
               退回
             </el-button>
             <el-button
+              v-if="canReopenConfirmed"
+              type="warning"
+              @click="handleReopen"
+            >
+              重新打开
+            </el-button>
+            <el-button
               v-if="canPin"
               :type="task?.is_pinned ? 'warning' : 'default'"
               @click="handlePin"
@@ -511,6 +518,7 @@ import {
   submitTask,
   confirmTask,
   rejectTask,
+  reopenTask,
   pinTask,
   getTaskSchedule,
   getCollaborators,
@@ -812,6 +820,14 @@ const canRejectSubmitted = computed(() => {
   )
 })
 
+const canReopenConfirmed = computed(() => {
+  return (
+    task.value?.status === 'confirmed' &&
+    (task.value?.creator_id === userStore.userInfo?.id ||
+      userStore.hasAnyRole('project_manager', 'system_admin'))
+  )
+})
+
 const isCurrentUserAssignee = computed(
   () => task.value?.assignee_id === userStore.userInfo?.id
 )
@@ -1067,6 +1083,24 @@ const handleRejectDetail = async () => {
     ElMessage.error(error.response?.data?.detail || '退回任务失败')
   } finally {
     rejectLoadingDetail.value = false
+  }
+}
+
+const handleReopen = async () => {
+  if (!task.value) return
+  try {
+    await ElMessageBox.confirm(
+      '确定重新打开该任务吗？重新打开后任务状态将回到“进行中”，相关确认统计会回滚。',
+      '重新打开任务',
+      { confirmButtonText: '确定重新打开', cancelButtonText: '取消', type: 'warning' }
+    )
+    await reopenTask(task.value.id)
+    ElMessage.success('任务已重新打开')
+    loadTask()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '重新打开任务失败')
+    }
   }
 }
 

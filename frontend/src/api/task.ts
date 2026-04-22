@@ -84,9 +84,13 @@ export interface TaskListResponse {
 
 export interface TaskFilterParams {
   status?: string
+  statuses?: string
   project_id?: number
+  project_ids?: string
   creator_id?: number
+  creator_ids?: string
   assignee_id?: number
+  assignee_ids?: string
   keyword?: string
   priority?: TaskPriority
   page?: number
@@ -372,6 +376,13 @@ export function confirmTask(taskId: number): Promise<Task> {
  */
 export function rejectTask(taskId: number, reason: string): Promise<Task> {
   return request.post(`/api/v1/tasks/${taskId}/reject`, { reason })
+}
+
+/**
+ * 重新打开已确认任务（回到进行中）
+ */
+export function reopenTask(taskId: number): Promise<Task> {
+  return request.post(`/api/v1/tasks/${taskId}/reopen`)
 }
 
 /**

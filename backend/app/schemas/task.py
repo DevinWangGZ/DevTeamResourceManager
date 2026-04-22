@@ -152,9 +152,13 @@ class TaskListResponse(BaseModel):
 class TaskFilterParams(BaseModel):
     """任务筛选参数"""
     status: Optional[TaskStatus] = None
+    statuses: Optional[List[TaskStatus]] = None
     project_id: Optional[int] = None
+    project_ids: Optional[List[int]] = None
     creator_id: Optional[int] = None
+    creator_ids: Optional[List[int]] = None
     assignee_id: Optional[int] = None
+    assignee_ids: Optional[List[int]] = None
     keyword: Optional[str] = None
     required_skills: Optional[str] = None  # 所需技能（逗号分隔）
     priority: Optional[str] = None  # 优先级筛选

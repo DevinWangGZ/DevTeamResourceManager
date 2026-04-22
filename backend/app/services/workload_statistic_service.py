@@ -125,6 +125,49 @@ class WorkloadStatisticService:
             return new_stat
 
     @staticmethod
+    def rollback_statistic_for_user(
+        db: Session,
+        user_id: int,
+        project_id: Optional[int],
+        man_days: Decimal,
+        ref_date=None,
+    ) -> None:
+        """
+        为指定用户回滚工作量统计（扣减 man_days）。
+        """
+        from datetime import date as date_type
+        if man_days <= 0:
+            return
+
+        today = date_type.today()
+        ref = ref_date if ref_date else today
+
+        period_start = date_type(ref.year, ref.month, 1)
+        if ref.month == 12:
+            period_end = date_type(ref.year + 1, 1, 1) - date_type.resolution
+        else:
+            period_end = date_type(ref.year, ref.month + 1, 1) - date_type.resolution
+
+        existing_stat = db.query(WorkloadStatistic).filter(
+            and_(
+                WorkloadStatistic.user_id == user_id,
+                WorkloadStatistic.project_id == project_id,
+                WorkloadStatistic.period_start == period_start,
+                WorkloadStatistic.period_end == period_end,
+            )
+        ).first()
+
+        if not existing_stat:
+            return
+
+        new_total = (existing_stat.total_man_days or Decimal("0")) - man_days
+        if new_total <= 0:
+            db.delete(existing_stat)
+        else:
+            existing_stat.total_man_days = new_total
+        db.commit()
+
+    @staticmethod
     def get_statistics(
         db: Session,
         filters: WorkloadStatisticFilterParams

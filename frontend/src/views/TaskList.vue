@@ -19,7 +19,15 @@
     <el-card class="filter-card">
       <el-form :inline="true" :model="filterForm" label-width="80px">
         <el-form-item label="状态">
-          <el-select v-model="filterForm.status" placeholder="全部" clearable style="width: 150px">
+          <el-select
+            v-model="filterForm.statuses"
+            placeholder="全部"
+            clearable
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            style="width: 220px"
+          >
             <el-option label="草稿" value="draft" />
             <el-option label="已发布" value="published" />
             <el-option label="待评估" value="pending_eval" />
@@ -32,11 +40,14 @@
         </el-form-item>
         <el-form-item label="项目">
           <el-select
-            v-model="filterForm.project_id"
+            v-model="filterForm.project_ids"
             placeholder="全部项目"
             clearable
             filterable
-            style="width: 180px"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            style="width: 220px"
             :loading="projectLoading"
           >
             <el-option
@@ -49,11 +60,14 @@
         </el-form-item>
         <el-form-item label="创建者">
           <el-select
-            v-model="filterForm.creator_id"
+            v-model="filterForm.creator_ids"
             placeholder="全部创建者"
             clearable
             filterable
-            style="width: 160px"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            style="width: 220px"
             :loading="userLoading"
           >
             <el-option
@@ -66,11 +80,14 @@
         </el-form-item>
         <el-form-item label="认领者">
           <el-select
-            v-model="filterForm.assignee_id"
+            v-model="filterForm.assignee_ids"
             placeholder="全部认领者"
             clearable
             filterable
-            style="width: 160px"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            style="width: 220px"
             :loading="userLoading"
           >
             <el-option
@@ -265,6 +282,15 @@
               退回
             </el-button>
             <el-button
+              v-if="canReopenConfirmed(row)"
+              link
+              type="warning"
+              size="small"
+              @click="handleReopen(row)"
+            >
+              重新打开
+            </el-button>
+            <el-button
               v-if="canDelete(row)"
               link
               type="danger"
@@ -378,6 +404,7 @@ import {
   revertTaskToDraft,
   returnTask,
   rejectTask,
+  reopenTask,
   type Task,
 } from '@/api/task'
 import { exportTasks } from '@/api/export'
@@ -399,11 +426,11 @@ const pagination = reactive({
 
 const showAdvancedFilter = ref(false)
 const filterForm = reactive({
-  status: '',
+  statuses: [] as string[],
   keyword: '',
-  project_id: undefined as number | undefined,
-  creator_id: undefined as number | undefined,
-  assignee_id: undefined as number | undefined,
+  project_ids: [] as number[],
+  creator_ids: [] as number[],
+  assignee_ids: [] as number[],
   created_date_range: [] as string[],
   deadline_range: [] as string[],
   min_man_days: undefined as number | undefined,
@@ -512,6 +539,14 @@ const canRejectSubmitted = (task: Task) => {
   )
 }
 
+const canReopenConfirmed = (task: Task) => {
+  return (
+    task.status === 'confirmed' &&
+    (task.creator_id === userStore.userInfo?.id ||
+      userStore.hasAnyRole('project_manager', 'system_admin'))
+  )
+}
+
 const canDelete = (task: Task) => {
   return task.creator_id === userStore.userInfo?.id
 }
@@ -563,20 +598,20 @@ const loadTasks = async () => {
       page_size: pagination.pageSize,
     }
 
-    if (filterForm.status) {
-      params.status = filterForm.status
+    if (filterForm.statuses.length > 0) {
+      params.statuses = filterForm.statuses.join(',')
     }
     if (filterForm.keyword) {
       params.keyword = filterForm.keyword
     }
-    if (filterForm.project_id) {
-      params.project_id = filterForm.project_id
+    if (filterForm.project_ids.length > 0) {
+      params.project_ids = filterForm.project_ids.join(',')
     }
-    if (filterForm.creator_id) {
-      params.creator_id = filterForm.creator_id
+    if (filterForm.creator_ids.length > 0) {
+      params.creator_ids = filterForm.creator_ids.join(',')
     }
-    if (filterForm.assignee_id) {
-      params.assignee_id = filterForm.assignee_id
+    if (filterForm.assignee_ids.length > 0) {
+      params.assignee_ids = filterForm.assignee_ids.join(',')
     }
 
     const result = await getTasks(params)
@@ -629,11 +664,11 @@ const loadTasks = async () => {
 }
 
 const resetFilter = () => {
-  filterForm.status = ''
+  filterForm.statuses = []
   filterForm.keyword = ''
-  filterForm.project_id = undefined
-  filterForm.creator_id = undefined
-  filterForm.assignee_id = undefined
+  filterForm.project_ids = []
+  filterForm.creator_ids = []
+  filterForm.assignee_ids = []
   filterForm.created_date_range = []
   filterForm.deadline_range = []
   filterForm.min_man_days = undefined
@@ -784,6 +819,27 @@ const handleReject = async () => {
   }
 }
 
+const handleReopen = async (task: Task) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定重新打开任务"${task.title}"吗？重新打开后任务状态将回到“进行中”，相关确认统计会回滚。`,
+      '重新打开任务',
+      {
+        confirmButtonText: '确定重新打开',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    await reopenTask(task.id)
+    ElMessage.success('任务已重新打开')
+    loadTasks()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '重新打开任务失败')
+    }
+  }
+}
+
 const viewTask = (taskId: number) => {
   router.push({ name: 'TaskDetail', params: { id: taskId } })
 }
@@ -858,17 +914,17 @@ const goToCreate = () => {
 const handleExport = async () => {
   try {
     const params: any = {}
-    if (filterForm.status) {
-      params.status = filterForm.status
+    if (filterForm.statuses.length > 0) {
+      params.statuses = filterForm.statuses.join(',')
     }
-    if (filterForm.project_id) {
-      params.project_id = filterForm.project_id
+    if (filterForm.project_ids.length > 0) {
+      params.project_ids = filterForm.project_ids.join(',')
     }
-    if (filterForm.creator_id) {
-      params.creator_id = filterForm.creator_id
+    if (filterForm.creator_ids.length > 0) {
+      params.creator_ids = filterForm.creator_ids.join(',')
     }
-    if (filterForm.assignee_id) {
-      params.assignee_id = filterForm.assignee_id
+    if (filterForm.assignee_ids.length > 0) {
+      params.assignee_ids = filterForm.assignee_ids.join(',')
     }
     
     const blob = await exportTasks(params)

@@ -60,9 +60,13 @@ async def create_task(
 @router.get("/", response_model=TaskListResponse)
 async def get_tasks(
     status: Optional[TaskStatus] = Query(None, description="任务状态"),
+    statuses: Optional[str] = Query(None, description="任务状态多选（逗号分隔）"),
     project_id: Optional[int] = Query(None, description="项目ID"),
+    project_ids: Optional[str] = Query(None, description="项目ID多选（逗号分隔）"),
     creator_id: Optional[int] = Query(None, description="创建者ID"),
+    creator_ids: Optional[str] = Query(None, description="创建者ID多选（逗号分隔）"),
     assignee_id: Optional[int] = Query(None, description="认领者ID"),
+    assignee_ids: Optional[str] = Query(None, description="认领者ID多选（逗号分隔）"),
     keyword: Optional[str] = Query(None, description="关键词搜索"),
     required_skills: Optional[str] = Query(None, description="所需技能（逗号分隔）"),
     priority: Optional[str] = Query(None, description="优先级筛选：P0/P1/P2"),
@@ -72,11 +76,43 @@ async def get_tasks(
     current_user: User = Depends(get_current_user)
 ):
     """获取任务列表"""
+    def parse_csv_ints(value: Optional[str]) -> Optional[list[int]]:
+        if not value:
+            return None
+        result = []
+        for raw in value.split(","):
+            item = raw.strip()
+            if not item:
+                continue
+            try:
+                result.append(int(item))
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=f"非法ID: {item}") from exc
+        return result or None
+
+    def parse_csv_statuses(value: Optional[str]) -> Optional[list[TaskStatus]]:
+        if not value:
+            return None
+        allowed = {s.value: s for s in TaskStatus}
+        result = []
+        for raw in value.split(","):
+            item = raw.strip()
+            if not item:
+                continue
+            if item not in allowed:
+                raise HTTPException(status_code=422, detail=f"非法任务状态: {item}")
+            result.append(allowed[item])
+        return result or None
+
     filters = TaskFilterParams(
         status=status,
+        statuses=parse_csv_statuses(statuses),
         project_id=project_id,
+        project_ids=parse_csv_ints(project_ids),
         creator_id=creator_id,
+        creator_ids=parse_csv_ints(creator_ids),
         assignee_id=assignee_id,
+        assignee_ids=parse_csv_ints(assignee_ids),
         keyword=keyword,
         required_skills=required_skills,
         priority=priority,
@@ -443,6 +479,25 @@ async def reject_task(
         current_user.id,
         role_codes,
         reject_data.reason
+    )
+    return task
+
+
+@router.post("/{task_id}/reopen", response_model=TaskResponse)
+async def reopen_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """重新打开已确认任务到"进行中"状态。
+    任务创建者、项目经理或系统管理员可操作。
+    """
+    role_codes = [role.code for role in current_user.roles] if current_user.roles else []
+    task = TaskService.reopen_task(
+        db,
+        task_id,
+        current_user.id,
+        role_codes
     )
     return task
 
