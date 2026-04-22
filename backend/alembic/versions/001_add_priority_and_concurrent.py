@@ -14,7 +14,7 @@ Create Date: 2026-02-27
 """
 from alembic import op
 import sqlalchemy as sa
-from decimal import Decimal
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -25,41 +25,55 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    tasks_columns = {col["name"] for col in inspector.get_columns("tasks")}
+    task_schedules_columns = {col["name"] for col in inspector.get_columns("task_schedules")}
+    task_collaborators_columns = {col["name"] for col in inspector.get_columns("task_collaborators")}
+    tasks_indexes = {idx["name"] for idx in inspector.get_indexes("tasks")}
+
     # 1. tasks 表新增优先级字段
-    op.add_column(
-        'tasks',
-        sa.Column('priority', sa.String(2), nullable=False, server_default='P2')
-    )
-    op.add_column(
-        'tasks',
-        sa.Column('priority_multiplier', sa.Numeric(4, 2), nullable=False, server_default='1.00')
-    )
-    op.create_index('ix_tasks_priority', 'tasks', ['priority'])
+    if "priority" not in tasks_columns:
+        op.add_column(
+            'tasks',
+            sa.Column('priority', sa.String(2), nullable=False, server_default='P2')
+        )
+    if "priority_multiplier" not in tasks_columns:
+        op.add_column(
+            'tasks',
+            sa.Column('priority_multiplier', sa.Numeric(4, 2), nullable=False, server_default='1.00')
+        )
+    if "ix_tasks_priority" not in tasks_indexes:
+        op.create_index('ix_tasks_priority', 'tasks', ['priority'])
 
     # 2. task_schedules 表新增并发排期字段
-    op.add_column(
-        'task_schedules',
-        sa.Column('is_concurrent', sa.Boolean(), nullable=False, server_default=sa.false())
-    )
-    op.add_column(
-        'task_schedules',
-        sa.Column(
-            'concurrent_with',
-            sa.Integer(),
-            sa.ForeignKey('tasks.id', ondelete='SET NULL'),
-            nullable=True
+    if "is_concurrent" not in task_schedules_columns:
+        op.add_column(
+            'task_schedules',
+            sa.Column('is_concurrent', sa.Boolean(), nullable=False, server_default=sa.false())
         )
-    )
+    if "concurrent_with" not in task_schedules_columns:
+        op.add_column(
+            'task_schedules',
+            sa.Column(
+                'concurrent_with',
+                sa.Integer(),
+                sa.ForeignKey('tasks.id', ondelete='SET NULL'),
+                nullable=True
+            )
+        )
 
     # 3. task_collaborators 表新增排期字段
-    op.add_column(
-        'task_collaborators',
-        sa.Column('scheduled_start', sa.Date(), nullable=True)
-    )
-    op.add_column(
-        'task_collaborators',
-        sa.Column('scheduled_end', sa.Date(), nullable=True)
-    )
+    if "scheduled_start" not in task_collaborators_columns:
+        op.add_column(
+            'task_collaborators',
+            sa.Column('scheduled_start', sa.Date(), nullable=True)
+        )
+    if "scheduled_end" not in task_collaborators_columns:
+        op.add_column(
+            'task_collaborators',
+            sa.Column('scheduled_end', sa.Date(), nullable=True)
+        )
 
 
 def downgrade() -> None:

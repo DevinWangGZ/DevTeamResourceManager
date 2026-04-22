@@ -9,6 +9,7 @@ Create Date: 2026-02-27
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -19,20 +20,32 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        'task_comments',
-        sa.Column('id', sa.Integer(), nullable=False, autoincrement=True),
-        sa.Column('task_id', sa.Integer(), sa.ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('content', sa.Text(), nullable=False),
-        sa.Column('created_at', sa.TIMESTAMP(), nullable=False, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.TIMESTAMP(), nullable=False, server_default=sa.func.now()),
-        sa.PrimaryKeyConstraint('id'),
-    )
-    op.create_index('ix_task_comments_id', 'task_comments', ['id'])
-    op.create_index('ix_task_comments_task_id', 'task_comments', ['task_id'])
-    op.create_index('ix_task_comments_user_id', 'task_comments', ['user_id'])
-    op.create_index('ix_task_comments_created_at', 'task_comments', ['created_at'])
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    table_names = set(inspector.get_table_names())
+
+    if "task_comments" not in table_names:
+        op.create_table(
+            'task_comments',
+            sa.Column('id', sa.Integer(), nullable=False, autoincrement=True),
+            sa.Column('task_id', sa.Integer(), sa.ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False),
+            sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+            sa.Column('content', sa.Text(), nullable=False),
+            sa.Column('created_at', sa.TIMESTAMP(), nullable=False, server_default=sa.func.now()),
+            sa.Column('updated_at', sa.TIMESTAMP(), nullable=False, server_default=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+        )
+
+    inspector = inspect(bind)
+    task_comments_indexes = {idx["name"] for idx in inspector.get_indexes("task_comments")}
+    if 'ix_task_comments_id' not in task_comments_indexes:
+        op.create_index('ix_task_comments_id', 'task_comments', ['id'])
+    if 'ix_task_comments_task_id' not in task_comments_indexes:
+        op.create_index('ix_task_comments_task_id', 'task_comments', ['task_id'])
+    if 'ix_task_comments_user_id' not in task_comments_indexes:
+        op.create_index('ix_task_comments_user_id', 'task_comments', ['user_id'])
+    if 'ix_task_comments_created_at' not in task_comments_indexes:
+        op.create_index('ix_task_comments_created_at', 'task_comments', ['created_at'])
 
 
 def downgrade() -> None:

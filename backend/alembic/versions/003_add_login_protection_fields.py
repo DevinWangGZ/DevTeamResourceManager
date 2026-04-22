@@ -12,6 +12,7 @@ Create Date: 2026-04-22
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -22,23 +23,33 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "users",
-        sa.Column("failed_login_attempts", sa.Integer(), nullable=False, server_default="0"),
-    )
-    op.add_column(
-        "users",
-        sa.Column("last_failed_login_at", sa.TIMESTAMP(), nullable=True),
-    )
-    op.add_column(
-        "users",
-        sa.Column("locked_until", sa.TIMESTAMP(), nullable=True),
-    )
-    op.add_column(
-        "users",
-        sa.Column("last_login_at", sa.TIMESTAMP(), nullable=True),
-    )
-    op.create_index("ix_users_locked_until", "users", ["locked_until"])
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    user_columns = {col["name"] for col in inspector.get_columns("users")}
+    user_indexes = {idx["name"] for idx in inspector.get_indexes("users")}
+
+    if "failed_login_attempts" not in user_columns:
+        op.add_column(
+            "users",
+            sa.Column("failed_login_attempts", sa.Integer(), nullable=False, server_default="0"),
+        )
+    if "last_failed_login_at" not in user_columns:
+        op.add_column(
+            "users",
+            sa.Column("last_failed_login_at", sa.TIMESTAMP(), nullable=True),
+        )
+    if "locked_until" not in user_columns:
+        op.add_column(
+            "users",
+            sa.Column("locked_until", sa.TIMESTAMP(), nullable=True),
+        )
+    if "last_login_at" not in user_columns:
+        op.add_column(
+            "users",
+            sa.Column("last_login_at", sa.TIMESTAMP(), nullable=True),
+        )
+    if "ix_users_locked_until" not in user_indexes:
+        op.create_index("ix_users_locked_until", "users", ["locked_until"])
 
 
 def downgrade() -> None:
