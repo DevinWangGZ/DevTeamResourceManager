@@ -32,11 +32,16 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(20) NOT NULL DEFAULT 'developer' COMMENT '用户角色: developer(开发人员), project_manager(项目经理), development_lead(开发组长), system_admin(系统管理员)',
     status_tag VARCHAR(50) COMMENT '趣味化情绪标签，如 "🚀火力全开"',
     is_active TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否激活',
+    failed_login_attempts INT NOT NULL DEFAULT 0 COMMENT '连续登录失败次数',
+    last_failed_login_at DATETIME NULL COMMENT '最近一次登录失败时间',
+    locked_until DATETIME NULL COMMENT '账号锁定截止时间',
+    last_login_at DATETIME NULL COMMENT '最近一次登录成功时间',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX idx_users_email (email),
     INDEX idx_users_username (username),
-    INDEX idx_users_role (role)
+    INDEX idx_users_role (role),
+    INDEX idx_users_locked_until (locked_until)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
 -- ============================================

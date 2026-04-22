@@ -1,5 +1,6 @@
 """认证相关端点"""
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -22,10 +23,12 @@ from app.services.auth_service import (
 from app.models.user import User, UserRole
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/login", response_model=Token, summary="用户登录")
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
@@ -37,15 +40,14 @@ async def login(
     
     返回访问令牌
     """
-    # 支持用户名或邮箱登录
     user = authenticate_user(db, form_data.username, form_data.password)
+
     if not user:
-        # 尝试使用邮箱登录
-        user_by_email = db.query(User).filter(User.email == form_data.username).first()
-        if user_by_email:
-            user = authenticate_user(db, user_by_email.username, form_data.password)
-    
-    if not user:
+        logger.warning(
+            "登录失败: identifier=%s client_ip=%s",
+            form_data.username,
+            request.client.host if request.client else "unknown",
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",

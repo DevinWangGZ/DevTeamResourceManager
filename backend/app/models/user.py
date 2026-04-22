@@ -42,6 +42,10 @@ class User(Base):
     )
     status_tag = Column(String(50))  # 趣味化情绪标签，如 "🚀火力全开"
     is_active = Column(Boolean, nullable=False, default=True)
+    failed_login_attempts = Column(Integer, nullable=False, default=0)
+    last_failed_login_at = Column(TIMESTAMP, nullable=True)
+    locked_until = Column(TIMESTAMP, nullable=True, index=True)
+    last_login_at = Column(TIMESTAMP, nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 

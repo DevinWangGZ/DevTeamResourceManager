@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-secret-key-change-in-production-min-32-chars"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30 * 24 * 60  # 30天
+
+    # 登录安全配置（防爆破）
+    LOGIN_MAX_FAILED_ATTEMPTS: int = 5
+    LOGIN_LOCK_MINUTES: int = 30
+    LOGIN_FAILURE_WINDOW_MINUTES: int = 15
     
     # 用户默认密码（管理员创建用户时使用）
     DEFAULT_USER_PASSWORD: str = "12345678"
