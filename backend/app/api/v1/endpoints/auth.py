@@ -1,5 +1,6 @@
 """认证相关端点"""
 import logging
+import re
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ from app.models.user import User, UserRole
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+PASSWORD_SPECIAL_CHAR_PATTERN = r"[!@#$%^&*(),.?\":{}|<>_\-\\/\[\]`~+=;']"
 
 
 @router.post("/login", response_model=Token, summary="用户登录")
@@ -109,15 +111,36 @@ async def change_password_endpoint(
     修改当前用户的密码
     
     - **old_password**: 原密码
-    - **new_password**: 新密码（至少8个字符）
+    - **new_password**: 新密码（至少8个字符，且包含大小写字母、数字、特殊字符）
     
     需要提供有效的访问令牌和正确的原密码
     """
-    # 验证新密码长度
-    if len(password_data.new_password) < 8:
+    # 验证新密码复杂度
+    new_password = password_data.new_password
+    if len(new_password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="新密码长度至少为8个字符"
+        )
+    if not re.search(r"[A-Z]", new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="新密码必须包含至少1个大写字母"
+        )
+    if not re.search(r"[a-z]", new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="新密码必须包含至少1个小写字母"
+        )
+    if not re.search(r"\d", new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="新密码必须包含至少1个数字"
+        )
+    if not re.search(PASSWORD_SPECIAL_CHAR_PATTERN, new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="新密码必须包含至少1个特殊字符"
         )
     
     user = change_password(
