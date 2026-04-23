@@ -524,6 +524,14 @@ class TaskService:
         if task.status not in [TaskStatus.CLAIMED.value, TaskStatus.IN_PROGRESS.value]:
             raise ValidationError("只有已认领或进行中状态的任务可以提交")
 
+        # 配合人分配合计：实际投入人天须不少于该合计
+        from app.services.task_collaborator_service import TaskCollaboratorService
+        collab_total = TaskCollaboratorService._calc_used_man_days(db, task_id)
+        if collab_total > 0 and actual_man_days < collab_total:
+            raise ValidationError(
+                f"实际投入人天不能少于配合人分配合计。配合人分配合计：{collab_total} 人天，本次填写：{actual_man_days} 人天"
+            )
+
         assignee_id = task.assignee_id
         old_status = task.status
         task.status = TaskStatus.SUBMITTED.value

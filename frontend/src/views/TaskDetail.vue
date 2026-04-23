@@ -284,7 +284,8 @@
               <span>任务配合人</span>
               <div class="collaborators-header-right">
                 <span class="man-days-summary">
-                  已分配 <b>{{ collaboratorsTotalDays }}</b> / 拟投入 <b>{{ task.estimated_man_days }}</b> 人天
+                  分配合计 <b>{{ collaboratorsTotalDays }}</b> 人天
+                  <span class="text-muted" style="margin-left: 6px">（拟投入 {{ task.estimated_man_days }} 人天，可超过）</span>
                 </span>
                 <el-button
                   v-if="canManageCollaborators"
@@ -383,12 +384,12 @@
           <el-input-number
             v-model="addForm.allocated_man_days"
             :min="0.01"
-            :max="remainingManDays || 0.01"
+            :max="9999"
             :precision="2"
             style="width: 100%"
           />
           <div class="form-hint">
-            剩余可分配：<b>{{ remainingManDays }}</b> 人天
+            可超过拟投入人天；提交任务时实际投入人天须不少于各配合人分配合计（当前分配合计 {{ collaboratorsTotalDays }} 人天）。
           </div>
         </el-form-item>
       </el-form>
@@ -410,11 +411,12 @@
           <el-input-number
             v-model="editManDays"
             :min="0.01"
+            :max="9999"
             :precision="2"
             style="width: 100%"
           />
           <div class="form-hint">
-            剩余可分配（不含本条）：{{ remainingManDaysForEdit }} 人天
+            可超过拟投入人天；提交时实际投入须不少于分配合计。
           </div>
         </el-form-item>
       </el-form>
@@ -443,6 +445,9 @@
       width="500px"
       @close="resetSubmitForm"
     >
+      <p v-if="collaboratorsTotalDays > 0" class="form-hint" style="margin: 0 0 12px; line-height: 1.5">
+        配合人分配合计 <b>{{ collaboratorsTotalDays }}</b> 人天，实际投入人天须不少于该合计。
+      </p>
       <el-form ref="submitFormRef" :model="submitForm" :rules="submitRules" label-width="100px">
         <el-form-item label="实际投入人天" prop="actual_man_days">
           <el-input-number
@@ -650,11 +655,7 @@ const rejectLoadingDetail = ref(false)
 const rejectReasonDetail = ref('')
 const rejectPresetsDetail = ['实际投入人天存在争议', '任务未达到预期']
 
-const submitRules: FormRules = {
-  actual_man_days: [{ required: true, message: '请输入实际投入人天', trigger: 'blur' }],
-}
-
-// ---- 配合人 ----
+// ---- 配合人（需早于提交校验规则） ----
 const collaborators = ref<Collaborator[]>([])
 const collaboratorLoading = ref(false)
 const showAddCollaboratorDialog = ref(false)
@@ -696,19 +697,27 @@ const collaboratorsTotalDays = computed(() =>
   collaborators.value.reduce((sum, c) => sum + Number(c.allocated_man_days), 0)
 )
 
-const remainingManDays = computed(() => {
-  const total = Number(task.value?.estimated_man_days || 0)
-  return Math.max(0, total - collaboratorsTotalDays.value)
-})
+const submitActualManDaysValidator = (
+  _rule: unknown,
+  value: number | undefined,
+  callback: (error?: string | Error) => void
+) => {
+  const sum = collaborators.value.reduce((s, c) => s + Number(c.allocated_man_days), 0)
+  if (sum > 0 && (value === undefined || value === null || Number(value) < sum)) {
+    callback(
+      new Error(`实际投入人天须不少于配合人分配合计（${sum} 人天）`)
+    )
+  } else {
+    callback()
+  }
+}
 
-const remainingManDaysForEdit = computed(() => {
-  if (!editCollaborator.value) return 0
-  const total = Number(task.value?.estimated_man_days || 0)
-  const others = collaborators.value
-    .filter(c => c.user_id !== editCollaborator.value!.user_id)
-    .reduce((sum, c) => sum + Number(c.allocated_man_days), 0)
-  return Math.max(0, total - others)
-})
+const submitRules: FormRules = {
+  actual_man_days: [
+    { required: true, message: '请输入实际投入人天', trigger: 'blur' },
+    { validator: submitActualManDaysValidator, trigger: 'blur' },
+  ],
+}
 
 const canManageCollaborators = computed(() => {
   if (!task.value || !userStore.userInfo) return false
@@ -1039,13 +1048,17 @@ const handleSubmit = async () => {
 }
 
 const openSubmitDialog = () => {
-  submitForm.actual_man_days = task.value?.estimated_man_days || 0
+  const est = Number(task.value?.estimated_man_days || 0)
+  const sum = collaborators.value.reduce((s, c) => s + Number(c.allocated_man_days), 0)
+  submitForm.actual_man_days = Math.max(est, sum) || est || 0.01
   showSubmitDialog.value = true
 }
 
 const resetSubmitForm = () => {
   submitFormRef.value?.resetFields()
-  submitForm.actual_man_days = task.value?.estimated_man_days || 0
+  const est = Number(task.value?.estimated_man_days || 0)
+  const sum = collaborators.value.reduce((s, c) => s + Number(c.allocated_man_days), 0)
+  submitForm.actual_man_days = Math.max(est, sum) || est || 0.01
 }
 
 const handleConfirm = async () => {

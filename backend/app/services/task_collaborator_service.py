@@ -82,7 +82,7 @@ class TaskCollaboratorService:
         data: CollaboratorAdd,
         current_user_id: int,
     ) -> CollaboratorResponse:
-        """添加配合人，并校验人天分配不超过任务总人天"""
+        """添加配合人。分配人天可超过任务拟投入；提交任务时由认领人填写的实际人天须不少于各配合人分配合计。"""
         task = TaskCollaboratorService._get_task_or_raise(db, task_id)
         TaskCollaboratorService._check_assignee_permission(task, current_user_id)
         TaskCollaboratorService._check_task_in_active_status(task)
@@ -105,15 +105,6 @@ class TaskCollaboratorService:
         ).first()
         if existing:
             raise ValidationError("该用户已是此任务的配合人")
-
-        # 校验人天总量：配合人分配合计 + 新增 ≤ 任务拟投入人天
-        used = TaskCollaboratorService._calc_used_man_days(db, task_id)
-        if used + data.allocated_man_days > task.estimated_man_days:
-            remaining = task.estimated_man_days - used
-            raise ValidationError(
-                f"人天分配超出任务总量。任务拟投入人天：{task.estimated_man_days}，"
-                f"已分配：{used}，可用剩余：{remaining}，本次请求：{data.allocated_man_days}"
-            )
 
         # 获取任务排期，校验配合人并发数
         from app.services.schedule_service import ScheduleService, MAX_CONCURRENT_TASKS
@@ -182,15 +173,6 @@ class TaskCollaboratorService:
         ).first()
         if not record:
             raise NotFoundError("配合人记录", f"task={task_id}, user={collaborator_user_id}")
-
-        # 校验人天总量（排除该用户当前已占用的部分再校验）
-        used = TaskCollaboratorService._calc_used_man_days(db, task_id, exclude_user_id=collaborator_user_id)
-        if used + data.allocated_man_days > task.estimated_man_days:
-            remaining = task.estimated_man_days - used
-            raise ValidationError(
-                f"人天分配超出任务总量。任务拟投入人天：{task.estimated_man_days}，"
-                f"其他配合人已分配：{used}，可用剩余：{remaining}，本次请求：{data.allocated_man_days}"
-            )
 
         record.allocated_man_days = data.allocated_man_days
         db.commit()

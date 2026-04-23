@@ -335,6 +335,13 @@
       width="500px"
       @close="resetSubmitForm"
     >
+      <p
+        v-if="collaboratorsAllocatedSumForSubmit > 0"
+        style="margin: 0 0 12px; line-height: 1.5; color: var(--el-text-color-secondary); font-size: 13px"
+      >
+        配合人分配合计 <b style="color: var(--el-text-color-primary)">{{ collaboratorsAllocatedSumForSubmit }}</b>
+        人天，实际投入人天须不少于该合计。
+      </p>
       <el-form ref="submitFormRef" :model="submitForm" :rules="submitRules" label-width="100px">
         <el-form-item label="实际投入人天" prop="actual_man_days">
           <el-input-number
@@ -405,6 +412,7 @@ import {
   returnTask,
   rejectTask,
   reopenTask,
+  getCollaborators,
   type Task,
 } from '@/api/task'
 import { exportTasks } from '@/api/export'
@@ -465,8 +473,27 @@ const submitForm = reactive({
   actual_man_days: 0,
 })
 
+/** 列表页提交弹窗用：打开时拉取配合人分配合计 */
+const collaboratorsAllocatedSumForSubmit = ref(0)
+
+const submitActualManDaysListValidator = (
+  _rule: unknown,
+  value: number | undefined,
+  callback: (error?: string | Error) => void
+) => {
+  const sum = collaboratorsAllocatedSumForSubmit.value
+  if (sum > 0 && (value === undefined || value === null || Number(value) < sum)) {
+    callback(new Error(`实际投入人天须不少于配合人分配合计（${sum} 人天）`))
+  } else {
+    callback()
+  }
+}
+
 const submitRules: FormRules = {
-  actual_man_days: [{ required: true, message: '请输入实际投入人天', trigger: 'blur' }],
+  actual_man_days: [
+    { required: true, message: '请输入实际投入人天', trigger: 'blur' },
+    { validator: submitActualManDaysListValidator, trigger: 'blur' },
+  ],
 }
 
 const getStatusText = (status: string) => {
@@ -738,9 +765,21 @@ const handleEvaluate = async (accept: boolean) => {
   }
 }
 
-const showSubmitDialogFunc = (task: Task) => {
+const showSubmitDialogFunc = async (task: Task) => {
   currentSubmitTask.value = task
-  submitForm.actual_man_days = task.estimated_man_days || 0
+  collaboratorsAllocatedSumForSubmit.value = 0
+  try {
+    const list = await getCollaborators(task.id)
+    collaboratorsAllocatedSumForSubmit.value = list.reduce(
+      (s, c) => s + Number(c.allocated_man_days),
+      0
+    )
+  } catch {
+    collaboratorsAllocatedSumForSubmit.value = 0
+  }
+  const est = Number(task.estimated_man_days || 0)
+  const sum = collaboratorsAllocatedSumForSubmit.value
+  submitForm.actual_man_days = Math.max(est, sum) || est || 0.01
   showSubmitDialog.value = true
 }
 
@@ -769,6 +808,7 @@ const handleSubmit = async () => {
 const resetSubmitForm = () => {
   submitFormRef.value?.resetFields()
   submitForm.actual_man_days = 0
+  collaboratorsAllocatedSumForSubmit.value = 0
   currentSubmitTask.value = null
 }
 
