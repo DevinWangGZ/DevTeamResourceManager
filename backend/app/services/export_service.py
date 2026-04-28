@@ -9,11 +9,10 @@ from decimal import Decimal
 
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
-from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.utils.units import pixels_to_EMU
 from sqlalchemy.orm import Session
+from PIL import Image as PILImage
 
 from app.services.task_service import TaskService
 from app.schemas.task import TaskFilterParams
@@ -97,48 +96,59 @@ class ExportService:
         image_stream_refs: list[io.BytesIO],
     ) -> None:
         """
-        在同一单元格内纵向偏移叠放多张图片。
-        - 每张图缩放后按固定间距向下偏移
-        - 动态抬高行高，确保全部可见
+        在同一单元格内展示多图：先合成为一张竖向拼接图，再插入单元格。
+        这样兼容性更高（WPS/Excel 都稳定），也能满足“同单元格多图”诉求。
         """
         if not image_urls:
             return
 
-        y_offset_px = 2
-        gap_px = 6
+        images: list[PILImage.Image] = []
+        gap_px = 8
         max_width_px = 210
-        max_height_px = 120
-        inserted = 0
-
+        per_image_max_height_px = 120
         for url in image_urls[:_MAX_IMAGES_PER_TASK]:
             image_buffer = ExportService._fetch_image_bytes(url)
             if not image_buffer:
                 continue
             try:
-                image_stream_refs.append(image_buffer)
-                excel_image = XLImage(image_buffer)
-                ExportService._scale_image(excel_image, max_width=max_width_px, max_height=max_height_px)
-                marker = AnchorMarker(
-                    col=col_idx - 1,
-                    colOff=pixels_to_EMU(2),
-                    row=row_idx - 1,
-                    rowOff=pixels_to_EMU(y_offset_px),
-                )
-                excel_image.anchor = OneCellAnchor(
-                    _from=marker,
-                    ext=(pixels_to_EMU(int(excel_image.width)), pixels_to_EMU(int(excel_image.height))),
-                )
-                ws.add_image(excel_image)
-                y_offset_px += int(excel_image.height) + gap_px
-                inserted += 1
+                pil = PILImage.open(image_buffer)
+                pil.load()
+                pil = pil.convert("RGB")
+                width, height = pil.size
+                if width <= 0 or height <= 0:
+                    continue
+                scale = min(max_width_px / width, per_image_max_height_px / height, 1.0)
+                new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+                if new_size != pil.size:
+                    pil = pil.resize(new_size, PILImage.Resampling.LANCZOS)
+                images.append(pil)
             except Exception:
                 continue
 
-        if inserted > 0:
-            ws.row_dimensions[row_idx].height = max(
-                ws.row_dimensions[row_idx].height or 15,
-                y_offset_px * 0.75 + 6,
-            )
+        if not images:
+            return
+
+        total_height = sum(img.height for img in images) + gap_px * (len(images) - 1)
+        max_width = max(img.width for img in images)
+        canvas = PILImage.new("RGB", (max_width, total_height), color=(255, 255, 255))
+
+        y = 0
+        for img in images:
+            x = (max_width - img.width) // 2
+            canvas.paste(img, (x, y))
+            y += img.height + gap_px
+
+        merged_buffer = io.BytesIO()
+        canvas.save(merged_buffer, format="PNG")
+        merged_buffer.seek(0)
+        image_stream_refs.append(merged_buffer)
+
+        excel_image = XLImage(merged_buffer)
+        ws.add_image(excel_image, f"{get_column_letter(col_idx)}{row_idx}")
+        ws.row_dimensions[row_idx].height = max(
+            ws.row_dimensions[row_idx].height or 15,
+            total_height * 0.75 + 6,
+        )
 
     @staticmethod
     def _create_header_style():
