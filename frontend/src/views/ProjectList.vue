@@ -189,6 +189,27 @@
             placeholder="项目立项时填写"
           />
         </el-form-item>
+        <el-form-item v-if="canManageCoManagersInEdit" label="协办项目经理">
+          <el-select
+            v-model="editManagerIds"
+            multiple
+            filterable
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="可多选项目经理，与创建者权限一致（任务执行、进展统计等）"
+            style="width: 100%"
+            :loading="pmUserLoading"
+          >
+            <el-option
+              v-for="u in pmCandidates"
+              :key="u.id"
+              :disabled="u.id === currentEditProject?.created_by"
+              :label="u.full_name ? `${u.full_name}（${u.username}）` : u.username"
+              :value="u.id"
+            />
+          </el-select>
+          <span class="form-hint">仅项目创建者与系统管理员可维护此项</span>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showEditDialogFlag = false">取消</el-button>
@@ -210,6 +231,7 @@ import {
   getProjects,
   createProject,
   updateProject,
+  updateProjectManagers,
   deleteProject,
   getProject,
   type Project,
@@ -255,6 +277,26 @@ const editForm = reactive<ProjectUpdate>({
   estimated_output_value: undefined,
 })
 
+const editManagerIds = ref<number[]>([])
+const pmCandidates = ref<UserInfo[]>([])
+const pmUserLoading = ref(false)
+
+const loadPmCandidates = async () => {
+  pmUserLoading.value = true
+  try {
+    const r = await getUsers({ limit: 1000, role: 'project_manager', is_active: true })
+    pmCandidates.value = r.items
+  } finally {
+    pmUserLoading.value = false
+  }
+}
+
+const canManageCoManagersInEdit = computed(() => {
+  if (!currentEditProject.value) return false
+  if (userStore.hasRole('system_admin')) return true
+  return currentEditProject.value.created_by === userStore.userInfo?.id
+})
+
 // 用户列表（用于筛选）
 const userList = ref<UserInfo[]>([])
 const userLoading = ref(false)
@@ -273,13 +315,21 @@ const canCreate = computed(() => {
 })
 
 const canViewAll = computed(() => {
-  return userStore.hasAnyRole('team_leader', 'system_admin')
+  return userStore.hasAnyRole('development_lead', 'system_admin')
 })
+
+/** 是否为该项目的项目经理（创建者或协办） */
+const isPmForProject = (project: Project) => {
+  const uid = userStore.userInfo?.id
+  if (!uid) return false
+  if (project.created_by === uid) return true
+  return (project.manager_user_ids ?? []).includes(uid)
+}
 
 const canEdit = (project: Project) => {
   if (userStore.hasRole('system_admin')) return true
   if (userStore.hasRole('project_manager')) {
-    return project.created_by === userStore.userInfo?.id
+    return isPmForProject(project)
   }
   return false
 }
@@ -307,15 +357,13 @@ const formatDate = (dateStr: string) => {
 const loadProjects = async () => {
   loading.value = true
   try {
-    const params: any = {
+    const params: Record<string, unknown> = {
       skip: (pagination.page - 1) * pagination.pageSize,
       limit: pagination.pageSize,
     }
 
-    // 如果不是管理员或开发组长，默认只显示自己创建的项目
-    if (!canViewAll.value) {
-      params.creator_id = userStore.userInfo?.id
-    } else if (filterForm.creator_id) {
+    // 开发组长 / 管理员可按创建者筛选；项目经理不传 creator_id，由后端汇总「自建 + 协办」
+    if (canViewAll.value && filterForm.creator_id) {
       params.creator_id = filterForm.creator_id
     }
 
@@ -380,6 +428,7 @@ const resetCreateForm = () => {
 const showEditDialogFunc = async (project: Project) => {
   currentEditProject.value = project
   try {
+    await loadPmCandidates()
     // 重新获取项目详情，确保数据最新
     const projectDetail = await getProject(project.id)
     Object.assign(editForm, {
@@ -389,6 +438,7 @@ const showEditDialogFunc = async (project: Project) => {
         ? Number(projectDetail.estimated_output_value)
         : undefined,
     })
+    editManagerIds.value = projectDetail.manager_user_ids ? [...projectDetail.manager_user_ids] : []
     showEditDialogFlag.value = true
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '加载项目详情失败')
@@ -402,7 +452,11 @@ const handleEdit = async () => {
     if (valid) {
       editLoading.value = true
       try {
-        await updateProject(currentEditProject.value!.id, editForm)
+        const pid = currentEditProject.value!.id
+        await updateProject(pid, editForm)
+        if (canManageCoManagersInEdit.value) {
+          await updateProjectManagers(pid, [...editManagerIds.value])
+        }
         ElMessage.success('项目更新成功')
         showEditDialogFlag.value = false
         loadProjects()
@@ -422,6 +476,7 @@ const resetEditForm = () => {
     description: '',
     estimated_output_value: undefined,
   })
+  editManagerIds.value = []
   currentEditProject.value = null
 }
 
@@ -460,7 +515,11 @@ const viewProjectProgress = (projectId: number) => {
 }
 
 const canViewTasks = (project: Project) => {
-  return userStore.hasAnyRole('project_manager', 'system_admin')
+  if (userStore.hasAnyRole('system_admin', 'development_lead')) return true
+  if (userStore.hasRole('project_manager')) {
+    return isPmForProject(project)
+  }
+  return false
 }
 
 const showProjectDetail = async (projectId: number) => {
@@ -547,5 +606,12 @@ onMounted(() => {
 
 .text-placeholder {
   color: var(--el-text-color-placeholder);
+}
+
+.form-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>

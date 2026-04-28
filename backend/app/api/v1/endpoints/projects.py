@@ -1,14 +1,17 @@
 """项目API端点"""
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional
+from collections import defaultdict
+from typing import Optional, List
 
 from app.api.deps import get_db, get_current_user
 from app.core.permissions import get_current_project_manager
 from app.models.user import User
+from app.models.project_manager import ProjectManager
 from app.schemas.project import (
     ProjectCreate,
     ProjectUpdate,
+    ProjectManagersUpdate,
     ProjectResponse,
     ProjectListResponse
 )
@@ -46,26 +49,50 @@ async def get_projects(
         # 开发人员只能查看所有项目（用于选择）
         projects, total = ProjectService.get_projects(db, creator_id=None, skip=skip, limit=limit)
     elif current_user.role == "project_manager":
-        # 项目经理可以查看所有项目，但默认只显示自己创建的
-        if creator_id is None:
-            creator_id = current_user.id
-        projects, total = ProjectService.get_projects(db, creator_id=creator_id, skip=skip, limit=limit)
+        # 项目经理：看到自己创建或被指定为协办管理员的项目（可选按创建者再筛）
+        projects, total = ProjectService.get_projects_managed_by_user(
+            db,
+            user_id=current_user.id,
+            creator_filter=creator_id,
+            skip=skip,
+            limit=limit,
+        )
     else:
-        # 开发组长和管理员可以查看所有项目
+        # 开发组长和管理员可以查看所有项目（可按 creator_id 筛选）
         projects, total = ProjectService.get_projects(db, creator_id=creator_id, skip=skip, limit=limit)
-    
-    # 填充创建者名称
+
     from app.models.user import User as UserModel
+
+    # 协办管理员 ID（批量填充到响应）
+    manager_map: defaultdict[int, List[int]] = defaultdict(list)
+    if projects:
+        pid_list = [p.id for p in projects]
+        for row in (
+            db.query(ProjectManager.project_id, ProjectManager.user_id)
+            .filter(ProjectManager.project_id.in_(pid_list))
+            .all()
+        ):
+            manager_map[row.project_id].append(row.user_id)
+
+    items: list[ProjectResponse] = []
     for project in projects:
         if project.creator:
-            project.creator_name = project.creator.full_name or project.creator.username
+            creator_nm = project.creator.full_name or project.creator.username
         else:
-            # 如果relationship未加载，手动查询
             creator = db.query(UserModel).filter(UserModel.id == project.created_by).first()
-            if creator:
-                project.creator_name = creator.full_name or creator.username
-    
-    return ProjectListResponse(total=total, items=projects)
+            creator_nm = (
+                creator.full_name or creator.username if creator else None
+            )
+        items.append(
+            ProjectResponse.model_validate(project).model_copy(
+                update={
+                    "creator_name": creator_nm,
+                    "manager_user_ids": sorted(manager_map.get(project.id, [])),
+                },
+            )
+        )
+
+    return ProjectListResponse(total=total, items=items)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -78,17 +105,19 @@ async def get_project(
     project = ProjectService.get_project(db, project_id)
     if not project:
         raise NotFoundError("项目不存在")
-    
-    # 填充创建者名称
+
     from app.models.user import User as UserModel
+
     if project.creator:
-        project.creator_name = project.creator.full_name or project.creator.username
+        creator_nm = project.creator.full_name or project.creator.username
     else:
         creator = db.query(UserModel).filter(UserModel.id == project.created_by).first()
-        if creator:
-            project.creator_name = creator.full_name or creator.username
-    
-    return project
+        creator_nm = creator.full_name or creator.username if creator else None
+
+    mids = ProjectService.get_co_manager_user_ids(db, project_id)
+    return ProjectResponse.model_validate(project).model_copy(
+        update={"creator_name": creator_nm, "manager_user_ids": mids},
+    )
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
@@ -106,6 +135,41 @@ async def update_project(
         raise HTTPException(status_code=404 if isinstance(e, NotFoundError) else 403, detail=str(e))
     except ValueError as e:
         raise ValidationError(str(e))
+
+
+@router.put("/{project_id}/managers", response_model=ProjectResponse)
+async def update_project_managers(
+    project_id: int,
+    body: ProjectManagersUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """设置协办项目经理（仅项目创建人或系统管理员）"""
+    from app.models.user import User as UserModel
+
+    project = ProjectService.get_project(db, project_id)
+    if not project:
+        raise NotFoundError("项目不存在")
+
+    can_manage = ProjectService.user_can_manage_co_managers(db, project_id, current_user.id)
+    if not can_manage and not current_user.has_role("system_admin"):
+        raise PermissionDeniedError("仅能由项目创建人维护协办管理员")
+
+    try:
+        ProjectService.set_co_managers(db, project_id, body.user_ids)
+    except ValueError as e:
+        raise ValidationError(str(e))
+
+    project = ProjectService.get_project(db, project_id)
+    if project.creator:
+        creator_nm = project.creator.full_name or project.creator.username
+    else:
+        creator = db.query(UserModel).filter(UserModel.id == project.created_by).first()
+        creator_nm = creator.full_name or creator.username if creator else None
+    mids = ProjectService.get_co_manager_user_ids(db, project_id)
+    return ProjectResponse.model_validate(project).model_copy(
+        update={"creator_name": creator_nm, "manager_user_ids": mids},
+    )
 
 
 @router.delete("/{project_id}", status_code=204)
@@ -140,11 +204,12 @@ async def get_project_tasks(
     project = ProjectService.get_project(db, project_id)
     if not project:
         raise NotFoundError("项目不存在")
-    
-    # 权限检查：项目经理只能查看自己创建的项目
-    if current_user.role == "project_manager" and project.created_by != current_user.id:
-        raise PermissionDeniedError("只能查看自己创建的项目")
-    
+
+    if current_user.role == "project_manager" and not ProjectService.user_can_manage_project(
+        db, project_id, current_user.id
+    ):
+        raise PermissionDeniedError("无权限查看该项目的任务数据")
+
     # 构建查询
     query = db.query(Task).options(
         joinedload(Task.creator),
@@ -244,11 +309,12 @@ async def get_project_progress(
     project = ProjectService.get_project(db, project_id)
     if not project:
         raise NotFoundError("项目不存在")
-    
-    # 权限检查：项目经理只能查看自己创建的项目
-    if current_user.role == "project_manager" and project.created_by != current_user.id:
-        raise PermissionDeniedError("只能查看自己创建的项目")
-    
+
+    if current_user.role == "project_manager" and not ProjectService.user_can_manage_project(
+        db, project_id, current_user.id
+    ):
+        raise PermissionDeniedError("无权限查看该项目的进展数据")
+
     # 1. 任务完成情况统计
     total_tasks = db.query(Task).filter(Task.project_id == project_id).count()
     draft_tasks = db.query(Task).filter(

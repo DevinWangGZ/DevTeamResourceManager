@@ -1,6 +1,6 @@
 """仪表盘服务"""
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, exists
 from typing import List, Optional
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -9,6 +9,7 @@ from app.models.task import Task, TaskStatus
 from app.models.task_collaborator import TaskCollaborator
 from app.models.workload_statistic import WorkloadStatistic
 from app.models.project import Project
+from app.models.project_manager import ProjectManager
 from app.models.project_output_value import ProjectOutputValue
 from app.models.user import User
 from app.models.user_sequence import UserSequence
@@ -307,8 +308,16 @@ class DashboardService:
     @staticmethod
     def get_project_manager_dashboard(db: Session, user_id: int) -> ProjectManagerDashboardResponse:
         """获取项目经理仪表盘数据"""
-        # 1. 获取用户创建的项目
-        projects = db.query(Project).filter(Project.created_by == user_id).all()
+        # 担任创建者或为协办项目经理的项目
+        co_managed_exists = exists().where(
+            ProjectManager.project_id == Project.id,
+            ProjectManager.user_id == user_id,
+        )
+        projects = (
+            db.query(Project)
+            .filter(or_(Project.created_by == user_id, co_managed_exists))
+            .all()
+        )
 
         project_summaries: List[ProjectTaskSummary] = []
         output_summaries: List[ProjectOutputSummary] = []

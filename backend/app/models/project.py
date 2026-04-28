@@ -29,6 +29,10 @@ class Project(Base):
         cascade="all, delete-orphan"
     )
     workload_statistics = relationship("WorkloadStatistic", back_populates="project", cascade="all, delete-orphan")
+    managers = relationship(
+        "ProjectManager",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<Project(id={self.id}, name={self.name}, estimated_output_value={self.estimated_output_value})>"

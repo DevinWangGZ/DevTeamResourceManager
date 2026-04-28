@@ -5,6 +5,7 @@ from app.models.role import Role, RoleType
 from app.models.skill import Skill, Proficiency
 from app.models.experience import Experience
 from app.models.project import Project
+from app.models.project_manager import ProjectManager
 from app.models.task import Task, TaskStatus
 from app.models.user_sequence import UserSequence
 from app.models.task_schedule import TaskSchedule
@@ -28,6 +29,7 @@ __all__ = [
     "Proficiency",
     "Experience",
     "Project",
+    "ProjectManager",
     "Task",
     "TaskStatus",
     "UserSequence",

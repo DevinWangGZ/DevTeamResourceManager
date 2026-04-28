@@ -10,6 +10,8 @@ export interface Project {
   estimated_output_value?: number
   created_by: number
   creator_name?: string
+  /** 协办项目经理用户 ID（不含创建者） */
+  manager_user_ids?: number[]
   created_at: string
   updated_at: string
 }
@@ -61,6 +63,13 @@ export function createProject(data: ProjectCreate): Promise<Project> {
  */
 export function updateProject(projectId: number, data: ProjectUpdate): Promise<Project> {
   return request.put(`/api/v1/projects/${projectId}`, data)
+}
+
+/**
+ * 设置协办项目经理（仅创建人或管理员）
+ */
+export function updateProjectManagers(projectId: number, user_ids: number[]): Promise<Project> {
+  return request.put(`/api/v1/projects/${projectId}/managers`, { user_ids })
 }
 
 /**

@@ -1,6 +1,6 @@
 """项目相关模式"""
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 
@@ -24,6 +24,12 @@ class ProjectUpdate(BaseModel):
     estimated_output_value: Optional[Decimal] = Field(None, description="预计产值（元）")
 
 
+class ProjectManagersUpdate(BaseModel):
+    """协办项目经理列表（不包含创建者；仅创建者可维护）"""
+
+    user_ids: List[int] = Field(default_factory=list, description="用户ID列表，仅能包含具备项目经理角色的用户")
+
+
 class ProjectResponse(ProjectBase):
     """项目响应模式"""
     id: int
@@ -31,6 +37,7 @@ class ProjectResponse(ProjectBase):
     created_at: datetime
     updated_at: datetime
     creator_name: Optional[str] = None  # 创建者名称
+    manager_user_ids: List[int] = Field(default_factory=list, description="协办项目经理用户ID列表")
 
     class Config:
         from_attributes = True

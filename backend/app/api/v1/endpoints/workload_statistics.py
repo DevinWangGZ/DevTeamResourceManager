@@ -13,6 +13,7 @@ from app.schemas.workload_statistic import (
     WorkloadSummaryResponse
 )
 from app.services.workload_statistic_service import WorkloadStatisticService
+from app.services.project_service import ProjectService
 from app.core.exceptions import PermissionDeniedError
 
 router = APIRouter()
@@ -135,12 +136,10 @@ async def get_project_statistics(
     - 项目经理：只能查看自己项目的统计
     - 开发组长/系统管理员：可以查看所有项目统计
     """
-    # 权限检查：项目经理只能查看自己创建的项目
-    if current_user.role == "project_manager":
-        from app.models.project import Project
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project or project.created_by != current_user.id:
-            raise PermissionDeniedError("只能查看自己项目的统计")
+    if current_user.role == "project_manager" and not ProjectService.user_can_manage_project(
+        db, project_id, current_user.id
+    ):
+        raise PermissionDeniedError("只能查看自己有权限的项目统计")
 
     statistics = WorkloadStatisticService.get_project_statistics(
         db,
