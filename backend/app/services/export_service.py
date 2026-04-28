@@ -2,6 +2,7 @@
 import io
 import re
 from urllib.request import urlopen
+from urllib.parse import urlparse, unquote
 from datetime import datetime, date
 from typing import Optional
 from decimal import Decimal
@@ -20,6 +21,7 @@ from app.models.task import TaskStatus
 from app.models.workload_statistic import WorkloadStatistic
 from app.models.user import User
 from app.models.project import Project
+from app.utils.paths import get_uploads_dir
 
 
 _MARKDOWN_IMAGE = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
@@ -51,6 +53,21 @@ class ExportService:
     @staticmethod
     def _fetch_image_bytes(url: str) -> Optional[io.BytesIO]:
         """下载图片并返回内存流；失败时返回 None，避免导出整体失败。"""
+        parsed = urlparse(url)
+        uploads_dir = get_uploads_dir().resolve()
+
+        # 站内图片优先直接读本地文件，避免经公网回环导致慢/超时
+        if parsed.path and parsed.path.startswith("/uploads/"):
+            try:
+                relative = parsed.path[len("/uploads/"):].lstrip("/")
+                local_path = (uploads_dir / unquote(relative)).resolve()
+                if local_path.is_file() and uploads_dir in local_path.parents:
+                    data = local_path.read_bytes()
+                    if data:
+                        return io.BytesIO(data)
+            except Exception:
+                pass
+
         try:
             with urlopen(url, timeout=_IMAGE_FETCH_TIMEOUT_SECONDS) as resp:
                 data = resp.read()
