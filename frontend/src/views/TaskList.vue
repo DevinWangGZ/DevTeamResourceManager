@@ -4,9 +4,13 @@
     <div class="task-header">
       <h2>任务管理</h2>
       <div class="header-actions">
-        <el-button @click="handleExport">
+        <el-button @click="handleExport(false)">
           <el-icon><Download /></el-icon>
           导出Excel
+        </el-button>
+        <el-button type="warning" plain @click="handleExport(true)">
+          <el-icon><Download /></el-icon>
+          导出含图片
         </el-button>
         <el-button type="primary" @click="goToCreate">
           <el-icon><Plus /></el-icon>
@@ -951,7 +955,7 @@ const goToCreate = () => {
   router.push({ name: 'TaskCreate' })
 }
 
-const handleExport = async () => {
+const handleExport = async (embedImages = false) => {
   try {
     const params: any = {}
     if (filterForm.statuses.length > 0) {
@@ -969,6 +973,7 @@ const handleExport = async () => {
     if (filterForm.keyword) {
       params.keyword = filterForm.keyword
     }
+    params.embed_images = embedImages
 
     const blob = await exportTasks(params)
     
@@ -982,7 +987,7 @@ const handleExport = async () => {
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
     
-    ElMessage.success('导出成功')
+    ElMessage.success(embedImages ? '导出（含图片）成功' : '导出成功')
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '导出失败')
   }

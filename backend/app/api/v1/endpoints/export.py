@@ -76,6 +76,7 @@ async def export_tasks(
     keyword: Optional[str] = Query(None, description="关键词搜索（标题或描述）"),
     required_skills: Optional[str] = Query(None, description="所需技能（逗号分隔）"),
     priority: Optional[str] = Query(None, description="优先级筛选：P0/P1/P2"),
+    embed_images: bool = Query(False, description="是否嵌入问题图片到Excel，默认false"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -135,6 +136,7 @@ async def export_tasks(
             filters=filters,
             current_user_id=current_user.id,
             current_user_role=current_user.role,
+            embed_images=embed_images,
         )
         
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")

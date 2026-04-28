@@ -23,6 +23,8 @@ from app.models.project import Project
 
 
 _MARKDOWN_IMAGE = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
+_IMAGE_FETCH_TIMEOUT_SECONDS = 8
+_MAX_IMAGES_PER_TASK = 3
 
 
 class ExportService:
@@ -50,7 +52,7 @@ class ExportService:
     def _fetch_image_bytes(url: str) -> Optional[io.BytesIO]:
         """下载图片并返回内存流；失败时返回 None，避免导出整体失败。"""
         try:
-            with urlopen(url, timeout=8) as resp:
+            with urlopen(url, timeout=_IMAGE_FETCH_TIMEOUT_SECONDS) as resp:
                 data = resp.read()
             if not data:
                 return None
@@ -91,7 +93,7 @@ class ExportService:
         max_height_px = 120
         inserted = 0
 
-        for url in image_urls:
+        for url in image_urls[:_MAX_IMAGES_PER_TASK]:
             image_buffer = ExportService._fetch_image_bytes(url)
             if not image_buffer:
                 continue
@@ -214,6 +216,7 @@ class ExportService:
         filters: TaskFilterParams,
         current_user_id: int,
         current_user_role: str,
+        embed_images: bool = False,
     ) -> io.BytesIO:
         """导出任务数据到Excel（筛选条件与任务列表 API 一致，最多 10000 条）。"""
         dumped = filters.model_dump()
@@ -259,12 +262,12 @@ class ExportService:
             }.get(task.status, task.status)
 
             desc, image_urls = ExportService._description_for_excel(task.description)
-            image_note = f"{len(image_urls)}张" if image_urls else ""
+            image_cell_value = "\n".join(image_urls) if image_urls else ""
             ws.append([
                 task.id,
                 task.title,
                 desc,
-                image_note,
+                image_cell_value,
                 project.name if project else "未分配项目",
                 status_text,
                 creator.full_name or creator.username if creator else "未知",
@@ -277,15 +280,17 @@ class ExportService:
 
             # 默认允许正文换行显示
             ws.cell(row=row_idx, column=3).alignment = Alignment(wrap_text=True, vertical="top")
+            ws.cell(row=row_idx, column=4).alignment = Alignment(wrap_text=True, vertical="top")
 
-            # 同一任务支持多图：都嵌入同一单元格并纵向偏移
-            ExportService._add_images_to_same_cell(
-                ws=ws,
-                row_idx=row_idx,
-                col_idx=4,
-                image_urls=image_urls,
-                image_stream_refs=image_stream_refs,
-            )
+            # 开启 embed_images 时才嵌图；默认关闭，仅保留 URL 文本，导出速度更可控。
+            if embed_images:
+                ExportService._add_images_to_same_cell(
+                    ws=ws,
+                    row_idx=row_idx,
+                    col_idx=4,
+                    image_urls=image_urls,
+                    image_stream_refs=image_stream_refs,
+                )
 
         # 调整列宽
         column_widths = [10, 28, 40, 18, 20, 12, 15, 15, 12, 12, 20, 20]
