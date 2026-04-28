@@ -8,6 +8,7 @@ from typing import Optional
 from datetime import date, datetime
 
 from app.api.deps import get_db, get_current_user
+from app.core.exceptions import AppException
 from app.models.task import TaskStatus
 from app.models.user import User
 from app.schemas.task import TaskFilterParams
@@ -81,9 +82,11 @@ async def export_tasks(
     current_user: User = Depends(get_current_user),
 ):
     """
-    导出任务数据到 Excel（筛选条件与 GET /tasks 一致，含多选与关键词）。
+    导出任务数据到 Excel。
 
-    权限规则与任务列表相同：开发人员仅能导出任务列表中可见的任务。
+    - 不传 project_id：筛选与 GET /tasks 一致（开发人员对应列表可见范围）。
+    - 仅带 project_id 且不带 project_ids：与同项目 GET /projects/{project_id}/tasks 一致，
+      避免页面看到整项目任务但导出却只有「列表级」数量的记录。
     """
 
     def parse_csv_ints(value: Optional[str]) -> Optional[list[int]]:
@@ -146,6 +149,10 @@ async def export_tasks(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers=_attachment_headers(filename, f"tasks_{ts}.xlsx"),
         )
+    except AppException:
+        raise
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
 

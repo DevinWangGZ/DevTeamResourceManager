@@ -250,11 +250,29 @@ class ExportService:
         dumped["page"] = 1
         dumped["page_size"] = 10000
         export_filters = TaskFilterParams.model_construct(**dumped)
+
+        bypass_dev_for_project_export = False
+        if filters.project_id and not filters.project_ids:
+            # 与同项目任务执行视图一致：可先访问该接口再看全部任务时再导出整套数据
+            from app.services.project_service import ProjectService
+
+            if (
+                current_user_role == "project_manager"
+                and not ProjectService.user_can_manage_project(
+                    db, filters.project_id, current_user_id
+                )
+            ):
+                from app.core.exceptions import PermissionDeniedError
+
+                raise PermissionDeniedError("无权限查看该项目的任务数据")
+            bypass_dev_for_project_export = True
+
         tasks, _ = TaskService.get_tasks(
             db,
             export_filters,
             current_user_id=current_user_id,
             current_user_role=current_user_role,
+            bypass_developer_visibility_for_single_project_export=bypass_dev_for_project_export,
         )
 
         wb = Workbook()

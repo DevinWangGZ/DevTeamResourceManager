@@ -50,7 +50,9 @@ class TaskService:
         db: Session,
         filters: TaskFilterParams,
         current_user_id: Optional[int] = None,
-        current_user_role: Optional[str] = None
+        current_user_role: Optional[str] = None,
+        *,
+        bypass_developer_visibility_for_single_project_export: bool = False,
     ) -> Tuple[List[Task], int]:
         """获取任务列表（支持筛选）"""
         from sqlalchemy.orm import joinedload
@@ -62,7 +64,11 @@ class TaskService:
         )
 
         # 权限过滤：开发人员只能看到自己相关的任务或已发布的任务
-        if current_user_role == "developer":
+        # 特例：按单项目导出已与 GET /projects/{id}/tasks 访问规则对齐时，不按该条收窄（导出与页面一致）
+        if (
+            current_user_role == "developer"
+            and not bypass_developer_visibility_for_single_project_export
+        ):
             query = query.filter(
                 or_(
                     Task.status == TaskStatus.PUBLISHED.value,
