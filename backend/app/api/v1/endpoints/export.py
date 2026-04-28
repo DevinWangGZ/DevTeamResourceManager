@@ -1,4 +1,6 @@
 """数据导出API端点"""
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -12,6 +14,15 @@ from app.models.user import UserRole
 from app.services.export_service import ExportService
 
 router = APIRouter()
+
+
+def _attachment_headers(filename_utf8: str, filename_ascii_fallback: str) -> dict[str, str]:
+    """RFC 5987：非 ASCII 文件名用 filename*，避免响应头 Latin-1 编码错误。"""
+    disp = (
+        f'attachment; filename="{filename_ascii_fallback}"; '
+        f"filename*=UTF-8''{quote(filename_utf8, safe='')}"
+    )
+    return {"Content-Disposition": disp}
 
 
 @router.get("/workload-statistics")
@@ -41,12 +52,12 @@ async def export_workload_statistics(
             period_end=period_end
         )
         
-        filename = f"工作量统计_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"工作量统计_{ts}.xlsx"
         return StreamingResponse(
             excel_file,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers=_attachment_headers(filename, f"workload_statistics_{ts}.xlsx"),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
@@ -85,12 +96,12 @@ async def export_tasks(
             assignee_id=assignee_id
         )
         
-        filename = f"任务列表_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"任务列表_{ts}.xlsx"
         return StreamingResponse(
             excel_file,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers=_attachment_headers(filename, f"tasks_{ts}.xlsx"),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
@@ -126,12 +137,12 @@ async def export_performance_data(
             period_end=period_end
         )
         
-        filename = f"绩效数据_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"绩效数据_{ts}.xlsx"
         return StreamingResponse(
             excel_file,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers=_attachment_headers(filename, f"performance_{ts}.xlsx"),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
