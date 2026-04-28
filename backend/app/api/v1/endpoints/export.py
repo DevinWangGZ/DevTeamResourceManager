@@ -8,9 +8,9 @@ from typing import Optional
 from datetime import date, datetime
 
 from app.api.deps import get_db, get_current_user
+from app.models.task import TaskStatus
 from app.models.user import User
-from app.core.permissions import require_roles
-from app.models.user import UserRole
+from app.schemas.task import TaskFilterParams
 from app.services.export_service import ExportService
 
 router = APIRouter()
@@ -65,35 +65,76 @@ async def export_workload_statistics(
 
 @router.get("/tasks")
 async def export_tasks(
-    status: Optional[str] = Query(None, description="任务状态"),
+    status: Optional[TaskStatus] = Query(None, description="任务状态"),
+    statuses: Optional[str] = Query(None, description="任务状态多选（逗号分隔）"),
     project_id: Optional[int] = Query(None, description="项目ID"),
+    project_ids: Optional[str] = Query(None, description="项目ID多选（逗号分隔）"),
     creator_id: Optional[int] = Query(None, description="创建者ID"),
-    assignee_id: Optional[int] = Query(None, description="负责人ID"),
+    creator_ids: Optional[str] = Query(None, description="创建者ID多选（逗号分隔）"),
+    assignee_id: Optional[int] = Query(None, description="认领者ID"),
+    assignee_ids: Optional[str] = Query(None, description="认领者ID多选（逗号分隔）"),
+    keyword: Optional[str] = Query(None, description="关键词搜索（标题或描述）"),
+    required_skills: Optional[str] = Query(None, description="所需技能（逗号分隔）"),
+    priority: Optional[str] = Query(None, description="优先级筛选：P0/P1/P2"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
-    导出任务数据到Excel
-    
-    权限：所有登录用户都可以导出
+    导出任务数据到 Excel（筛选条件与 GET /tasks 一致，含多选与关键词）。
+
+    权限规则与任务列表相同：开发人员仅能导出任务列表中可见的任务。
     """
-    # 权限检查：普通开发人员只能导出自己相关的任务
-    if current_user.role == "developer":
-        if creator_id and creator_id != current_user.id:
-            raise HTTPException(status_code=403, detail="无权限导出其他用户创建的任务")
-        if assignee_id and assignee_id != current_user.id:
-            raise HTTPException(status_code=403, detail="无权限导出其他用户负责的任务")
-        # 开发人员默认只能看到自己负责或创建的任务
-        if not creator_id and not assignee_id:
-            assignee_id = current_user.id
-    
+
+    def parse_csv_ints(value: Optional[str]) -> Optional[list[int]]:
+        if not value:
+            return None
+        result = []
+        for raw in value.split(","):
+            item = raw.strip()
+            if not item:
+                continue
+            try:
+                result.append(int(item))
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=f"非法ID: {item}") from exc
+        return result or None
+
+    def parse_csv_statuses(value: Optional[str]) -> Optional[list[TaskStatus]]:
+        if not value:
+            return None
+        allowed = {s.value: s for s in TaskStatus}
+        result = []
+        for raw in value.split(","):
+            item = raw.strip()
+            if not item:
+                continue
+            if item not in allowed:
+                raise HTTPException(status_code=422, detail=f"非法任务状态: {item}")
+            result.append(allowed[item])
+        return result or None
+
+    filters = TaskFilterParams(
+        status=status,
+        statuses=parse_csv_statuses(statuses),
+        project_id=project_id,
+        project_ids=parse_csv_ints(project_ids),
+        creator_id=creator_id,
+        creator_ids=parse_csv_ints(creator_ids),
+        assignee_id=assignee_id,
+        assignee_ids=parse_csv_ints(assignee_ids),
+        keyword=keyword,
+        required_skills=required_skills,
+        priority=priority,
+        page=1,
+        page_size=100,
+    )
+
     try:
         excel_file = ExportService.export_tasks(
-            db=db,
-            status=status,
-            project_id=project_id,
-            creator_id=creator_id,
-            assignee_id=assignee_id
+            db,
+            filters=filters,
+            current_user_id=current_user.id,
+            current_user_role=current_user.role,
         )
         
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")

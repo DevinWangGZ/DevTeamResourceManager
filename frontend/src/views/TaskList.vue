@@ -966,7 +966,10 @@ const handleExport = async () => {
     if (filterForm.assignee_ids.length > 0) {
       params.assignee_ids = filterForm.assignee_ids.join(',')
     }
-    
+    if (filterForm.keyword) {
+      params.keyword = filterForm.keyword
+    }
+
     const blob = await exportTasks(params)
     
     // 创建下载链接
