@@ -8,6 +8,14 @@
         <el-tag v-if="projectId" type="info">项目ID: {{ projectId }}</el-tag>
       </div>
       <div class="header-right">
+        <el-button @click="handleExport(false)" :loading="exportLoading">
+          <el-icon><Download /></el-icon>
+          导出Excel
+        </el-button>
+        <el-button type="warning" plain @click="handleExport(true)" :loading="exportLoading">
+          <el-icon><Download /></el-icon>
+          导出（含图片）
+        </el-button>
         <el-button @click="goBack">返回</el-button>
         <el-button type="primary" @click="refreshData" :loading="loading">
           <el-icon><Refresh /></el-icon>
@@ -151,15 +159,17 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { Download, Refresh } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/layout/Breadcrumb.vue'
 import TaskTimeline from '@/components/business/TaskTimeline.vue'
-import { getProjectTasks, type ProjectTaskExecutionResponse, type ProjectTask } from '@/api/project'
+import { getProjectTasks, type ProjectTask } from '@/api/project'
+import { exportTasks } from '@/api/export'
 
 const route = useRoute()
 const router = useRouter()
 
 const loading = ref(false)
+const exportLoading = ref(false)
 const projectId = ref<number | null>(null)
 const projectName = ref<string>('')
 const tasks = ref<ProjectTask[]>([])
@@ -257,6 +267,45 @@ const viewTaskDetail = (task: ProjectTask) => {
 
 const goBack = () => {
   router.push('/projects')
+}
+
+/** 导出与任务列表同源接口：当前项目 + 顶部筛选条件；含图时后端嵌图Excel */
+const handleExport = async (embedImages: boolean) => {
+  if (!projectId.value) return
+
+  exportLoading.value = true
+  try {
+    const params: Record<string, unknown> = {
+      project_id: projectId.value,
+      embed_images: embedImages,
+    }
+    if (filterForm.status) {
+      params.status = filterForm.status
+    }
+    if (filterForm.assignee_id != null) {
+      params.assignee_id = filterForm.assignee_id
+    }
+    if (filterForm.keyword?.trim()) {
+      params.keyword = filterForm.keyword.trim()
+    }
+
+    const blob = await exportTasks(params)
+    const url = window.URL.createObjectURL(blob as Blob)
+    const link = document.createElement('a')
+    link.href = url
+    const suffix = embedImages ? '_含图片' : ''
+    link.download = `项目${projectId.value}_任务导出${suffix}_${new Date().toISOString().split('T')[0]}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    ElMessage.success(embedImages ? '导出（含图片）成功' : '导出成功')
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { detail?: string } } }
+    ElMessage.error(err.response?.data?.detail || '导出失败')
+  } finally {
+    exportLoading.value = false
+  }
 }
 
 onMounted(() => {
