@@ -39,14 +39,14 @@
       <el-skeleton :rows="2" animated />
     </div>
 
-    <div v-else-if="displayList.length === 0" class="board-empty">
+    <div v-else-if="latestDisplayList.length === 0" class="board-empty">
       <el-icon class="empty-icon"><Notification /></el-icon>
       <span>暂无公告</span>
     </div>
 
     <transition-group v-else name="ann-list" tag="div" class="ann-list">
       <div
-        v-for="ann in displayList"
+        v-for="ann in latestDisplayList"
         :key="ann.id"
         class="ann-item"
         :class="[`priority-${ann.priority}`, { inactive: !ann.is_active }]"
@@ -115,6 +115,12 @@
       </div>
     </transition-group>
 
+    <div v-if="moreDisplayList.length > 0" class="more-entry">
+      <el-button text type="primary" @click="moreVisible = true">
+        查看更多公告（{{ moreDisplayList.length }}）
+      </el-button>
+    </div>
+
     <!-- 全文查看弹窗 -->
     <el-dialog
       v-model="detailVisible"
@@ -152,6 +158,69 @@
       <template #footer>
         <el-button type="primary" @click="detailVisible = false">关闭</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 更多公告弹窗 -->
+    <el-dialog
+      v-model="moreVisible"
+      title="更多系统公告"
+      width="720px"
+      class="ann-dialog ann-more-dialog"
+    >
+      <div v-if="moreDisplayList.length === 0" class="board-empty">
+        <el-icon class="empty-icon"><Notification /></el-icon>
+        <span>暂无更多公告</span>
+      </div>
+      <div v-else class="ann-list more-ann-list">
+        <div
+          v-for="ann in moreDisplayList"
+          :key="`more-${ann.id}`"
+          class="ann-item"
+          :class="[`priority-${ann.priority}`, { inactive: !ann.is_active }]"
+        >
+          <div class="priority-bar" />
+          <div class="ann-body">
+            <div class="ann-top">
+              <div class="ann-meta">
+                <el-tag
+                  :type="priorityTagType(ann.priority)"
+                  size="small"
+                  effect="dark"
+                  round
+                  class="priority-tag"
+                >
+                  {{ priorityLabel(ann.priority) }}
+                </el-tag>
+                <span class="ann-title">{{ ann.title }}</span>
+                <el-tag v-if="!ann.is_active" type="info" size="small" effect="plain" round>
+                  已停用
+                </el-tag>
+              </div>
+            </div>
+
+            <div
+              class="ann-content-wrap"
+              :class="{ clickable: isLong(ann.content) }"
+              @click="isLong(ann.content) && openDetail(ann)"
+            >
+              <p class="ann-content">{{ ann.content }}</p>
+              <span v-if="isLong(ann.content)" class="expand-link">
+                查看全文 <el-icon style="vertical-align: -2px; font-size: 12px"><ArrowRight /></el-icon>
+              </span>
+            </div>
+
+            <div class="ann-footer">
+              <div class="ann-author">
+                <el-avatar :size="18" class="author-avatar">
+                  {{ (ann.author_name || '?').charAt(0).toUpperCase() }}
+                </el-avatar>
+                <span>{{ ann.author_name || '管理员' }}</span>
+              </div>
+              <span class="ann-time">{{ formatTime(ann.created_at) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </el-dialog>
 
     <!-- 创建 / 编辑对话框 -->
@@ -246,6 +315,7 @@ const announcements = ref<Announcement[]>([])
 const showAll = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
+const moreVisible = ref(false)
 
 // 全文查看
 const detailVisible = ref(false)
@@ -283,6 +353,10 @@ const displayList = computed(() => {
   if (showAll.value) return announcements.value
   return announcements.value.filter(a => a.is_active)
 })
+
+const latestDisplayList = computed(() => displayList.value.slice(0, 2))
+
+const moreDisplayList = computed(() => displayList.value.slice(2))
 
 const form = reactive({
   title: '',
@@ -478,6 +552,17 @@ onMounted(loadAnnouncements)
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.more-entry {
+  margin-top: 10px;
+  text-align: right;
+}
+
+.more-ann-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .ann-item {
