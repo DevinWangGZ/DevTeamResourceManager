@@ -86,3 +86,6 @@ backend/__pycache__/
 # Temporary files
 *.tmp
 *.temp
+
+# Bulk user import (contains names and initial password — local only)
+scripts/bulk_import_developers.py
